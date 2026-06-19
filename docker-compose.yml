@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cvh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cvh_password}
+      POSTGRES_DB: ${POSTGRES_DB:-cvh_dashboards}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cvh} -d ${POSTGRES_DB:-cvh_dashboards}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-cvh}:${POSTGRES_PASSWORD:-cvh_password}@db:5432/${POSTGRES_DB:-cvh_dashboards}}
+      SECRET_KEY: ${SECRET_KEY:-change-me}
+      ACCESS_TOKEN_TTL_MIN: ${ACCESS_TOKEN_TTL_MIN:-15}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-14}
+      CONTENT_TOKEN_TTL_SEC: ${CONTENT_TOKEN_TTL_SEC:-300}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-this-password}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrator}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@example.com}
+      SMTP_TLS: ${SMTP_TLS:-true}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+    volumes:
+      - uploads:/data/uploads
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:
+  uploads:

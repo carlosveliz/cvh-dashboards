@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import (
@@ -6,10 +7,16 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from .config import settings
 
-engine = create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
+# Under tests the suite spans multiple event loops; NullPool avoids reusing an
+# asyncpg connection bound to a loop that has already closed.
+if os.environ.get("TESTING") == "1":
+    engine = create_async_engine(settings.database_url, echo=False, poolclass=NullPool)
+else:
+    engine = create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 

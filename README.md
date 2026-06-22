@@ -26,12 +26,37 @@ usuario.
 ## Arranque rápido (producción local)
 
 ```bash
-cp .env.example .env        # edita SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD
+cp .env.example .env
+# Genera un SECRET_KEY fuerte (obligatorio: el backend NO arranca con uno débil):
+python -c "import secrets; print('SECRET_KEY=' + secrets.token_urlsafe(48))"
+# Pega el valor en .env y ajusta ADMIN_EMAIL / ADMIN_PASSWORD.
 docker compose up -d --build
 ```
 
-La app queda en `http://localhost:8080`. El backend crea las tablas y siembra el
-admin definido en `.env` en el primer arranque.
+La app queda en `http://localhost:8180`. En el primer arranque el backend aplica
+las **migraciones de base de datos** (Alembic) y siembra el admin definido en
+`.env`.
+
+> **SECRET_KEY:** debe tener ≥32 caracteres y no ser un valor por defecto. Si es
+> débil, el backend falla al arrancar con un mensaje claro (es intencional:
+> firma los tokens de sesión).
+
+> **ADMIN_EMAIL:** usa un dominio real. Dominios reservados (`.local`, `.test`,
+> `.example`, `localhost`) se rechazan al arrancar, porque el login los
+> invalidaría y el admin no podría entrar.
+
+### Migraciones de base de datos
+
+El esquema se gestiona con **Alembic** y se aplica solo (`alembic upgrade head`)
+al iniciar el contenedor `backend`.
+
+Si vienes de una versión anterior cuyo esquema fue creado automáticamente (antes
+de Alembic), marca la línea base una vez para no recrear tablas existentes:
+
+```bash
+docker compose exec backend alembic stamp 3a87edb88fd7
+docker compose exec backend alembic upgrade head
+```
 
 ## Desarrollo (hot reload)
 

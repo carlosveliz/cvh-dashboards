@@ -6,6 +6,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 DashboardType = Literal["static_html", "excel"]
 Visibility = Literal["restricted", "internal", "external", "personal"]
+ChartType = Literal["bar", "line", "area", "pie", "none"]
+
+
+class ExcelConfig(BaseModel):
+    sheet: str
+    chart_type: ChartType = "bar"
+    category: str
+    series: list[str] = Field(default_factory=list)
 
 
 class DashboardRead(BaseModel):
@@ -18,6 +26,7 @@ class DashboardRead(BaseModel):
     type: str
     visibility: str
     group_name: str | None = None
+    excel_config: ExcelConfig | None = None
     file_name: str | None = None
     has_content: bool = False
     uploaded_at: datetime | None = None
@@ -37,6 +46,7 @@ class DashboardUpdate(BaseModel):
     description: str | None = None
     visibility: Visibility | None = None
     group_name: str | None = Field(default=None, max_length=120)
+    excel_config: ExcelConfig | None = None
 
 
 class PermissionSet(BaseModel):

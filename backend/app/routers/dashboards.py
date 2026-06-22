@@ -48,6 +48,7 @@ def _to_read(d: Dashboard) -> DashboardRead:
         type=d.type,
         visibility=d.visibility,
         group_name=d.group_name,
+        excel_config=d.excel_config,
         file_name=d.file_name,
         has_content=bool(d.file_path),
         uploaded_at=d.uploaded_at,
@@ -133,7 +134,7 @@ async def excel_data(
         event_type=audit.DASHBOARD_VIEW, request=request, user=user,
         target_type="dashboard", target_id=d.id, target_label=d.name,
     )
-    return render_excel(raw)
+    return render_excel(raw, d.excel_config)
 
 
 # ---------- Admin CRUD ----------
@@ -193,6 +194,8 @@ async def update_dashboard(
         d.visibility = payload.visibility
     if payload.group_name is not None:
         d.group_name = payload.group_name or None
+    if payload.excel_config is not None:
+        d.excel_config = payload.excel_config.model_dump()
     await db.commit()
     await db.refresh(d)
     await audit.record(

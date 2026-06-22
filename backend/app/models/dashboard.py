@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import BigInteger, DateTime, String, Text, Uuid, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db import Base
@@ -20,6 +22,8 @@ class Dashboard(Base):
     visibility: Mapped[str] = mapped_column(String(16), default="restricted", nullable=False)
     # Optional folder/group shown in the launcher (null -> "General").
     group_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Excel chart config (null -> heuristic): {sheet, chart_type, category, series[]}
+    excel_config: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     file_path: Mapped[str | None] = mapped_column(String, nullable=True)
     file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)

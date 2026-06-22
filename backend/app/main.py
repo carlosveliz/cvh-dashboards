@@ -7,11 +7,13 @@ from . import models  # noqa: F401  (register models on Base.metadata)
 from .config import settings
 from .routers import auth, content, dashboards, users
 from .seed import seed_admin
+from .startup import check_secret_key
 from .services.storage import ensure_upload_dir
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    check_secret_key(settings.secret_key)
     # Schema is managed by Alembic (run in the container entrypoint), not here.
     ensure_upload_dir()
     await seed_admin()

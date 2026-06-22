@@ -231,6 +231,7 @@ function CreateModal({
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [group, setGroup] = useState("");
   const [type, setType] = useState<DashboardType>("static_html");
   const [visibility, setVisibility] = useState<Visibility>("restricted");
   const [error, setError] = useState("");
@@ -241,9 +242,16 @@ function CreateModal({
     setError("");
     setLoading(true);
     try {
-      await api.post("/api/dashboards", { name, description: description || null, type, visibility });
+      await api.post("/api/dashboards", {
+        name,
+        description: description || null,
+        type,
+        visibility,
+        group_name: group.trim() || null,
+      });
       setName("");
       setDescription("");
+      setGroup("");
       setType("static_html");
       setVisibility("restricted");
       onCreated();
@@ -267,6 +275,15 @@ function CreateModal({
             className="input min-h-[72px]"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="label">Grupo / carpeta (opcional)</label>
+          <input
+            className="input"
+            value={group}
+            onChange={(e) => setGroup(e.target.value)}
+            placeholder="Ej: Finanzas, Operaciones…"
           />
         </div>
         <div className="grid grid-cols-2 gap-4">

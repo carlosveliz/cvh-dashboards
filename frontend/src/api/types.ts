@@ -25,6 +25,7 @@ export interface Dashboard {
   description: string | null;
   type: DashboardType;
   visibility: Visibility;
+  group_name: string | null;
   file_name: string | null;
   has_content: boolean;
   uploaded_at: string | null;

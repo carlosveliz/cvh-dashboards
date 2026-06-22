@@ -1,6 +1,6 @@
 import { LayoutGrid } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { ErrorText, Spinner } from "../components/ui";
 import { useAuth } from "../lib/auth";
 
@@ -74,6 +74,12 @@ export default function Login() {
           <button type="submit" className="btn-primary w-full" disabled={loading}>
             {loading ? <Spinner className="border-primary-fg" /> : "Entrar"}
           </button>
+          <Link
+            to="/forgot-password"
+            className="block text-center text-sm text-muted-fg hover:text-fg"
+          >
+            ¿Olvidaste tu contraseña?
+          </Link>
         </form>
       </div>
     </div>

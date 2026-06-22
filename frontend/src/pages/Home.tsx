@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { FileSpreadsheet, LayoutDashboard } from "lucide-react";
+import { FileSpreadsheet, LayoutDashboard, Search } from "lucide-react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import type { Dashboard } from "../api/types";
@@ -17,17 +18,85 @@ function timeAgo(iso: string | null): string {
   return min > 0 ? `hace ${min} min` : "recién";
 }
 
+function DashboardCard({ d }: { d: Dashboard }) {
+  return (
+    <Link
+      to={`/d/${d.id}`}
+      className="card group flex flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
+    >
+      <div className="mb-4 flex items-start justify-between">
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-xl ${
+            d.type === "excel" ? "bg-accent-soft text-accent" : "bg-primary-soft text-primary"
+          }`}
+        >
+          {d.type === "excel" ? (
+            <FileSpreadsheet className="h-6 w-6" />
+          ) : (
+            <LayoutDashboard className="h-6 w-6" />
+          )}
+        </div>
+        <TypeBadge type={d.type} />
+      </div>
+      <h3 className="font-medium text-fg group-hover:text-primary">{d.name}</h3>
+      {d.description && (
+        <p className="mt-1 line-clamp-2 text-sm text-muted-fg">{d.description}</p>
+      )}
+      <div className="mt-auto pt-4 text-xs text-muted-fg">
+        Actualizado {timeAgo(d.uploaded_at)}
+      </div>
+    </Link>
+  );
+}
+
 export default function Home() {
   const { data, isLoading } = useQuery({
     queryKey: ["dashboards"],
     queryFn: async () => (await api.get<Dashboard[]>("/api/dashboards")).data,
   });
+  const [q, setQ] = useState("");
+
+  // Filter by search, then group by group_name (null -> "General").
+  const groups = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const filtered = (data ?? []).filter(
+      (d) =>
+        !term ||
+        d.name.toLowerCase().includes(term) ||
+        (d.description ?? "").toLowerCase().includes(term),
+    );
+    const map = new Map<string, Dashboard[]>();
+    for (const d of filtered) {
+      const key = d.group_name?.trim() || "General";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(d);
+    }
+    // Sort group names, keep "General" last.
+    return [...map.entries()].sort(([a], [b]) => {
+      if (a === "General") return 1;
+      if (b === "General") return -1;
+      return a.localeCompare(b);
+    });
+  }, [data, q]);
 
   return (
     <Layout>
-      <div className="mb-8">
-        <h1 className="font-display text-3xl font-semibold text-fg">Tus dashboards</h1>
-        <p className="mt-1 text-muted-fg">Selecciona un reporte para abrirlo.</p>
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-semibold text-fg">Tus dashboards</h1>
+          <p className="mt-1 text-muted-fg">Selecciona un reporte para abrirlo.</p>
+        </div>
+        {data && data.length > 0 && (
+          <div className="relative w-full max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-fg" />
+            <input
+              className="input pl-9"
+              placeholder="Buscar dashboard…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       {isLoading ? (
@@ -40,38 +109,26 @@ export default function Home() {
             El administrador te dará acceso cuando estén listos.
           </p>
         </div>
+      ) : groups.length === 0 ? (
+        <div className="card px-6 py-16 text-center text-muted-fg">
+          No hay dashboards que coincidan con "{q}".
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {data.map((d) => (
-            <Link
-              key={d.id}
-              to={`/d/${d.id}`}
-              className="card group flex flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
-            >
-              <div className="mb-4 flex items-start justify-between">
-                <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                    d.type === "excel"
-                      ? "bg-accent-soft text-accent"
-                      : "bg-primary-soft text-primary"
-                  }`}
-                >
-                  {d.type === "excel" ? (
-                    <FileSpreadsheet className="h-6 w-6" />
-                  ) : (
-                    <LayoutDashboard className="h-6 w-6" />
-                  )}
-                </div>
-                <TypeBadge type={d.type} />
-              </div>
-              <h3 className="font-medium text-fg group-hover:text-primary">{d.name}</h3>
-              {d.description && (
-                <p className="mt-1 line-clamp-2 text-sm text-muted-fg">{d.description}</p>
+        <div className="space-y-8">
+          {groups.map(([group, items]) => (
+            <section key={group}>
+              {/* Only show the group header when there's more than one group. */}
+              {groups.length > 1 && (
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-fg">
+                  {group}
+                </h2>
               )}
-              <div className="mt-auto pt-4 text-xs text-muted-fg">
-                Actualizado {timeAgo(d.uploaded_at)}
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((d) => (
+                  <DashboardCard key={d.id} d={d} />
+                ))}
               </div>
-            </Link>
+            </section>
           ))}
         </div>
       )}

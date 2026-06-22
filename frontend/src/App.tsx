@@ -3,8 +3,10 @@ import { FullSpinner } from "./components/ui";
 import { useAuth } from "./lib/auth";
 import AcceptInvite from "./pages/AcceptInvite";
 import DashboardViewer from "./pages/DashboardViewer";
+import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminAudit from "./pages/admin/Audit";
 import AdminDashboards from "./pages/admin/Dashboards";
@@ -30,6 +32,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/accept-invite" element={<AcceptInvite />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       <Route
         path="/"

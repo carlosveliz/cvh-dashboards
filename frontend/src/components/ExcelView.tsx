@@ -1,20 +1,97 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { api } from "../api/client";
-import type { ExcelData } from "../api/types";
+import type { ExcelSheet, ExcelData } from "../api/types";
 import { FullSpinner } from "./ui";
 
 const CHART_COLORS = ["#8b8ef0", "#5fc9b0", "#f0a3b8", "#f3c969", "#9bb5f0"];
+
+function Chart({ chart }: { chart: NonNullable<ExcelSheet["chart"]> }) {
+  const type = chart.type ?? "bar";
+  const grid = <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 18% 92%)" />;
+  const axes = (
+    <>
+      <XAxis dataKey="category" tick={{ fontSize: 12 }} />
+      <YAxis tick={{ fontSize: 12 }} />
+    </>
+  );
+
+  // ResponsiveContainer must wrap the recharts chart DIRECTLY (it injects
+  // width/height into its single child), so it lives inside each branch.
+  let inner;
+  if (type === "line") {
+    inner = (
+      <LineChart data={chart.data}>
+        {grid}
+        {axes}
+        <Tooltip />
+        <Legend />
+        {chart.series.map((s, i) => (
+          <Line key={s} type="monotone" dataKey={s} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} />
+        ))}
+      </LineChart>
+    );
+  } else if (type === "area") {
+    inner = (
+      <AreaChart data={chart.data}>
+        {grid}
+        {axes}
+        <Tooltip />
+        <Legend />
+        {chart.series.map((s, i) => (
+          <Area key={s} type="monotone" dataKey={s} stroke={CHART_COLORS[i % CHART_COLORS.length]} fill={CHART_COLORS[i % CHART_COLORS.length]} fillOpacity={0.25} />
+        ))}
+      </AreaChart>
+    );
+  } else if (type === "pie") {
+    const key = chart.series[0]; // Pie uses the first series only.
+    inner = (
+      <PieChart>
+        <Tooltip />
+        <Legend />
+        <Pie data={chart.data} dataKey={key} nameKey="category" outerRadius={120} label>
+          {chart.data.map((_, i) => (
+            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+          ))}
+        </Pie>
+      </PieChart>
+    );
+  } else {
+    inner = (
+      <BarChart data={chart.data}>
+        {grid}
+        {axes}
+        <Tooltip />
+        <Legend />
+        {chart.series.map((s, i) => (
+          <Bar key={s} dataKey={s} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[4, 4, 0, 0]} />
+        ))}
+      </BarChart>
+    );
+  }
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      {inner}
+    </ResponsiveContainer>
+  );
+}
 
 export function ExcelView({ dashboardId }: { dashboardId: string }) {
   const { data, isLoading, error } = useQuery({
@@ -54,23 +131,7 @@ export function ExcelView({ dashboardId }: { dashboardId: string }) {
         <div className="card mb-6 p-5">
           <h3 className="mb-4 font-medium text-fg">Resumen</h3>
           <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sheet.chart.data}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(240 18% 92%)" />
-                <XAxis dataKey="category" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                {sheet.chart.series.map((s, i) => (
-                  <Bar
-                    key={s}
-                    dataKey={s}
-                    fill={CHART_COLORS[i % CHART_COLORS.length]}
-                    radius={[4, 4, 0, 0]}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+            <Chart chart={sheet.chart} />
           </div>
         </div>
       )}

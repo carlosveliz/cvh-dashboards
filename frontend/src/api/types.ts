@@ -26,6 +26,7 @@ export interface Dashboard {
   type: DashboardType;
   visibility: Visibility;
   group_name: string | null;
+  excel_config: ExcelConfig | null;
   file_name: string | null;
   has_content: boolean;
   uploaded_at: string | null;
@@ -38,11 +39,14 @@ export interface InvitationResult {
   emailed: boolean;
 }
 
+export type ChartType = "bar" | "line" | "area" | "pie" | "none";
+
 export interface ExcelSheet {
   name: string;
   columns: string[];
   rows: (string | number | boolean | null)[][];
   chart: {
+    type?: ChartType;
     category: string;
     series: string[];
     data: Record<string, string | number | null>[];
@@ -51,6 +55,13 @@ export interface ExcelSheet {
 
 export interface ExcelData {
   sheets: ExcelSheet[];
+}
+
+export interface ExcelConfig {
+  sheet: string;
+  chart_type: ChartType;
+  category: string;
+  series: string[];
 }
 
 export interface ContentToken {

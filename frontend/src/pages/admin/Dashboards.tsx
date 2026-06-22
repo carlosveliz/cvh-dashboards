@@ -1,8 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { History, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
-import { FormEvent, useRef, useState } from "react";
+import { BarChart3, History, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
-import type { Dashboard, DashboardType, DashboardVersion, Visibility } from "../../api/types";
+import type {
+  ChartType,
+  Dashboard,
+  DashboardType,
+  DashboardVersion,
+  ExcelData,
+  Visibility,
+} from "../../api/types";
 import { ErrorText, FullSpinner, Modal, Spinner, TypeBadge } from "../../components/ui";
 
 const VISIBILITIES: { value: Visibility; label: string }[] = [
@@ -16,6 +23,7 @@ export default function AdminDashboards() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [versionsFor, setVersionsFor] = useState<Dashboard | null>(null);
+  const [chartFor, setChartFor] = useState<Dashboard | null>(null);
   const [uploadError, setUploadError] = useState<Record<string, string>>({});
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -102,6 +110,16 @@ export default function AdminDashboards() {
               )}
               Subir {d.type === "excel" ? ".xlsx" : ".html"}
             </button>
+            {d.type === "excel" && (
+              <button
+                className="btn-ghost p-2.5"
+                onClick={() => setChartFor(d)}
+                disabled={!d.has_content}
+                title="Configurar gráfico"
+              >
+                <BarChart3 className="h-4 w-4" />
+              </button>
+            )}
             <button
               className="btn-ghost p-2.5"
               onClick={() => setVersionsFor(d)}
@@ -137,7 +155,177 @@ export default function AdminDashboards() {
         onClose={() => setVersionsFor(null)}
         onRestored={() => qc.invalidateQueries({ queryKey: ["admin-dashboards"] })}
       />
+
+      <ChartConfigModal
+        dashboard={chartFor}
+        onClose={() => setChartFor(null)}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["admin-dashboards"] })}
+      />
     </div>
+  );
+}
+
+const CHART_TYPES: { value: ChartType; label: string }[] = [
+  { value: "bar", label: "Barras" },
+  { value: "line", label: "Líneas" },
+  { value: "area", label: "Área" },
+  { value: "pie", label: "Pastel" },
+  { value: "none", label: "Sin gráfico" },
+];
+
+function ChartConfigModal({
+  dashboard,
+  onClose,
+  onSaved,
+}: {
+  dashboard: Dashboard | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const id = dashboard?.id;
+  const [sheet, setSheet] = useState("");
+  const [chartType, setChartType] = useState<ChartType>("bar");
+  const [category, setCategory] = useState("");
+  const [series, setSeries] = useState<string[]>([]);
+
+  // Load the parsed Excel to populate sheet/column choices.
+  const data = useQuery({
+    queryKey: ["excel-admin", id],
+    enabled: !!id,
+    queryFn: async () => (await api.get<ExcelData>(`/api/dashboards/${id}/data`)).data,
+  });
+
+  // Seed form from the dashboard's existing config (or first sheet) once loaded.
+  useEffect(() => {
+    if (!dashboard || !data.data) return;
+    const cfg = dashboard.excel_config;
+    const first = data.data.sheets[0];
+    if (cfg) {
+      setSheet(cfg.sheet);
+      setChartType(cfg.chart_type);
+      setCategory(cfg.category);
+      setSeries(cfg.series);
+    } else if (first) {
+      setSheet(first.name);
+      setChartType(first.chart?.type ?? "bar");
+      setCategory(first.chart?.category ?? first.columns[0] ?? "");
+      setSeries(first.chart?.series ?? []);
+    }
+  }, [dashboard, data.data]);
+
+  const activeSheet = data.data?.sheets.find((s) => s.name === sheet);
+
+  const save = useMutation({
+    mutationFn: async () =>
+      api.patch(`/api/dashboards/${id}`, {
+        excel_config: { sheet, chart_type: chartType, category, series },
+      }),
+    onSuccess: () => {
+      onSaved();
+      onClose();
+    },
+  });
+
+  function toggleSeries(col: string) {
+    setSeries((prev) => (prev.includes(col) ? prev.filter((c) => c !== col) : [...prev, col]));
+  }
+
+  return (
+    <Modal open={!!dashboard} onClose={onClose} title={`Gráfico — ${dashboard?.name ?? ""}`}>
+      {data.isLoading ? (
+        <div className="py-8">
+          <FullSpinner />
+        </div>
+      ) : !data.data ? (
+        <p className="py-6 text-center text-muted-fg">No se pudo leer el Excel.</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="label">Hoja</label>
+              <select
+                className="input"
+                value={sheet}
+                onChange={(e) => setSheet(e.target.value)}
+              >
+                {data.data.sheets.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Tipo de gráfico</label>
+              <select
+                className="input"
+                value={chartType}
+                onChange={(e) => setChartType(e.target.value as ChartType)}
+              >
+                {CHART_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {chartType !== "none" && (
+            <>
+              <div>
+                <label className="label">Columna de categoría (eje X)</label>
+                <select
+                  className="input"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  {(activeSheet?.columns ?? []).map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Series (columnas a graficar)</label>
+                <div className="flex flex-wrap gap-2">
+                  {(activeSheet?.columns ?? [])
+                    .filter((c) => c !== category)
+                    .map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => toggleSeries(c)}
+                        className={`badge px-3 py-1.5 ${
+                          series.includes(c)
+                            ? "bg-primary text-primary-fg"
+                            : "bg-muted text-muted-fg"
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" className="btn-outline" onClick={onClose}>
+              Cancelar
+            </button>
+            <button
+              className="btn-primary"
+              onClick={() => save.mutate()}
+              disabled={save.isPending || !sheet}
+            >
+              {save.isPending ? <Spinner className="border-primary-fg" /> : "Guardar"}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

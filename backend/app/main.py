@@ -10,7 +10,7 @@ from .config import settings
 from .routers import auth, content, dashboards, users
 from .seed import seed_admin
 from .security.limiter import limiter
-from .startup import check_secret_key
+from .startup import check_secret_key, start_cleanup_loop
 from .services.storage import ensure_upload_dir
 
 
@@ -20,7 +20,9 @@ async def lifespan(app: FastAPI):
     # Schema is managed by Alembic (run in the container entrypoint), not here.
     ensure_upload_dir()
     await seed_admin()
+    cleanup_task = start_cleanup_loop()
     yield
+    cleanup_task.cancel()
 
 
 app = FastAPI(title="CVH Dashboards", lifespan=lifespan)

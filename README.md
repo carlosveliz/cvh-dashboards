@@ -68,6 +68,35 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 - Frontend (Vite): `http://localhost:5173`
 - Backend (FastAPI docs): `http://localhost:8000/docs`
 
+## Versiones de archivos
+
+Cada vez que subes un nuevo HTML/Excel a un dashboard se guarda como una **versión**.
+Se conservan las **últimas 10**; las más antiguas se eliminan automáticamente. Desde
+el panel de administración puedes ver el historial y **restaurar** una versión anterior
+(el dashboard vuelve a servir ese archivo, sin redeploy).
+
+## Backups
+
+`scripts/backup.sh` respalda la base de datos (`pg_dump`) y los archivos subidos
+(volumen `uploads`) en `./backups/`:
+
+```bash
+# Usa el nombre de proyecto de compose (por defecto "cvh-dashboards")
+COMPOSE_PROJECT=cvh-dashboards ./scripts/backup.sh
+```
+
+Programar con cron (diario a las 03:00):
+
+```bash
+0 3 * * * cd /ruta/cvh-dashboards && ./scripts/backup.sh >> backups/backup.log 2>&1
+```
+
+Restaurar (sobrescribe los datos actuales; detén el tráfico antes):
+
+```bash
+./scripts/restore.sh backups/db-AAAAMMDD-HHMMSS.sql.gz backups/uploads-AAAAMMDD-HHMMSS.tar.gz
+```
+
 ## Variables de entorno
 
 Ver `.env.example`. Las `SMTP_*` son opcionales: sin ellas, las invitaciones devuelven

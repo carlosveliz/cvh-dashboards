@@ -20,6 +20,12 @@ dist/
 backend/uploads/
 data/
 
+# Backups produced by scripts/backup.sh
+backups/
+
+# Local verification compose (not part of the deployable stack)
+docker-compose.verify.yml
+
 # OS / editor
 .DS_Store
 .idea/

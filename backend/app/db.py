@@ -14,9 +14,9 @@ from .config import settings
 # Under tests the suite spans multiple event loops; NullPool avoids reusing an
 # asyncpg connection bound to a loop that has already closed.
 if os.environ.get("TESTING") == "1":
-    engine = create_async_engine(settings.database_url, echo=False, poolclass=NullPool)
+    engine = create_async_engine(settings.db_url, echo=False, poolclass=NullPool)
 else:
-    engine = create_async_engine(settings.database_url, echo=False, pool_pre_ping=True)
+    engine = create_async_engine(settings.db_url, echo=False, pool_pre_ping=True)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 

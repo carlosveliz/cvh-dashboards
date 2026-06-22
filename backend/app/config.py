@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy import URL
 
 
 class Settings(BaseSettings):
@@ -8,7 +9,17 @@ class Settings(BaseSettings):
 
     # Core
     secret_key: str = "change-me"
-    database_url: str = "postgresql+asyncpg://cvh:cvh_password@db:5432/cvh_dashboards"
+
+    # Database. Prefer the discrete POSTGRES_* parts: the URL is assembled with
+    # URL.create(), which safely escapes passwords containing @ / : # etc.
+    # (a hand-built DATABASE_URL string would corrupt on those characters).
+    # An explicit DATABASE_URL, if set, overrides the parts.
+    database_url: str = ""
+    postgres_user: str = "cvh"
+    postgres_password: str = "cvh_password"
+    postgres_db: str = "cvh_dashboards"
+    postgres_host: str = "db"
+    postgres_port: int = 5432
 
     # Tokens
     access_token_ttl_min: int = 15
@@ -41,6 +52,21 @@ class Settings(BaseSettings):
     @property
     def smtp_enabled(self) -> bool:
         return bool(self.smtp_host)
+
+    @property
+    def db_url(self) -> str | URL:
+        """SQLAlchemy URL: an explicit DATABASE_URL if given, else assembled
+        from the POSTGRES_* parts with proper escaping."""
+        if self.database_url:
+            return self.database_url
+        return URL.create(
+            "postgresql+asyncpg",
+            username=self.postgres_user,
+            password=self.postgres_password,
+            host=self.postgres_host,
+            port=self.postgres_port,
+            database=self.postgres_db,
+        )
 
 
 @lru_cache

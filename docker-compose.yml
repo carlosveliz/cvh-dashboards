@@ -21,7 +21,14 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-cvh}:${POSTGRES_PASSWORD:-cvh_password}@db:5432/${POSTGRES_DB:-cvh_dashboards}"
+      # Pass DB parts (not a pre-built URL): the backend assembles the URL with
+      # proper escaping, so passwords with @ / : # work. Set DATABASE_URL only to
+      # override with an explicit connection string.
+      POSTGRES_USER: ${POSTGRES_USER:-cvh}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cvh_password}
+      POSTGRES_DB: ${POSTGRES_DB:-cvh_dashboards}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
       SECRET_KEY: ${SECRET_KEY:-change-me}
       ACCESS_TOKEN_TTL_MIN: ${ACCESS_TOKEN_TTL_MIN:-15}
       REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-14}

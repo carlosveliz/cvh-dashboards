@@ -16,6 +16,7 @@ class UserRead(BaseModel):
     is_active: bool
     display_name: str | None = None
     created_at: datetime
+    last_login_at: datetime | None = None
 
 
 class UserCreate(BaseModel):

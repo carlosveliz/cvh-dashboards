@@ -2,12 +2,12 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..db import get_db
-from ..models import DashboardAccess, Invitation, User
+from ..models import AuditLog, DashboardAccess, Invitation, User
 from ..schemas import (
     InvitationCreate,
     InvitationResult,
@@ -31,8 +31,18 @@ router = APIRouter(
 
 @router.get("", response_model=list[UserRead])
 async def list_users(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).order_by(User.created_at))
-    return result.scalars().all()
+    users = (await db.execute(select(User).order_by(User.created_at))).scalars().all()
+    # Last successful login per user, derived from the audit log.
+    rows = await db.execute(
+        select(AuditLog.user_id, func.max(AuditLog.created_at))
+        .where(AuditLog.event_type == "login_success", AuditLog.user_id.is_not(None))
+        .group_by(AuditLog.user_id)
+    )
+    last_login = {uid: ts for uid, ts in rows.all()}
+    return [
+        UserRead.model_validate(u).model_copy(update={"last_login_at": last_login.get(u.id)})
+        for u in users
+    ]
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)

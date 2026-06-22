@@ -6,6 +6,17 @@ import type { InvitationResult, Role, User } from "../../api/types";
 import { ErrorText, FullSpinner, Modal, Spinner } from "../../components/ui";
 import { useAuth } from "../../lib/auth";
 
+function fmtLogin(iso: string | null): string {
+  if (!iso) return "Nunca";
+  return new Date(iso).toLocaleString("es", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function AdminUsers() {
   const qc = useQueryClient();
   const { user: me } = useAuth();
@@ -50,6 +61,7 @@ export default function AdminUsers() {
               <th className="px-4 py-3 font-semibold">Usuario</th>
               <th className="px-4 py-3 font-semibold">Rol</th>
               <th className="px-4 py-3 font-semibold">Estado</th>
+              <th className="px-4 py-3 font-semibold">Último acceso</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -85,6 +97,9 @@ export default function AdminUsers() {
                   >
                     {u.is_active ? "Activo" : "Inactivo"}
                   </button>
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-muted-fg">
+                  {fmtLogin(u.last_login_at)}
                 </td>
                 <td className="px-4 py-3 text-right">
                   {u.id !== me?.id && (

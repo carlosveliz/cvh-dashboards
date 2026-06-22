@@ -4,6 +4,7 @@
 transaction (it must work even when the handler raises, e.g. a failed login)
 and can never break a request: any failure is logged and swallowed."""
 
+import ipaddress
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -38,12 +39,35 @@ USER_DELETE = "user_delete"
 INVITE_CREATE = "invite_create"
 
 
+def _is_public(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return not (addr.is_private or addr.is_loopback or addr.is_link_local)
+
+
 def _client_ip(request: Request | None) -> str | None:
+    """Best-effort real client IP behind one or more proxies.
+
+    X-Forwarded-For is a chain "client, proxy1, proxy2, ...". We return the
+    first PUBLIC address in it (the real client when proxies append correctly),
+    falling back to the leftmost entry, then X-Real-IP, then the direct peer.
+    If everything is internal (e.g. accessed from the same network), an internal
+    IP is the correct answer."""
     if request is None:
         return None
     fwd = request.headers.get("x-forwarded-for")
     if fwd:
-        return fwd.split(",")[0].strip()
+        parts = [p.strip() for p in fwd.split(",") if p.strip()]
+        for ip in parts:
+            if _is_public(ip):
+                return ip
+        if parts:
+            return parts[0]
+    real = request.headers.get("x-real-ip")
+    if real:
+        return real.strip()
     return request.client.host if request.client else None
 
 

@@ -8,4 +8,7 @@ python -m app.migrate
 if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+# --proxy-headers + trust all upstreams: we sit behind nginx/Coolify, which set
+# X-Forwarded-For; this makes request.client reflect the real client too.
+exec uvicorn app.main:app --host 0.0.0.0 --port 8000 \
+  --proxy-headers --forwarded-allow-ips='*'

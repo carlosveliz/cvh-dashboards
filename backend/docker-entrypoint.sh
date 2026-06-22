@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 set -e
 
-# Apply pending DB migrations, then start the app.
-alembic upgrade head
+# Apply DB migrations (adopting a pre-Alembic schema if present), then start.
+python -m app.migrate
 
 # Honor an explicit compose `command:` (e.g. dev hot-reload); otherwise default.
 if [ "$#" -gt 0 ]; then

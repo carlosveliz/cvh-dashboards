@@ -1,12 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Save } from "lucide-react";
+import { Check, KeyRound, LayoutDashboard, Save, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import type { Dashboard, User } from "../../api/types";
-import { FullSpinner, Spinner } from "../../components/ui";
+import { FullSpinner, Spinner, TypeBadge } from "../../components/ui";
+
+type Mode = "dashboard" | "user";
 
 export default function AdminPermissions() {
   const qc = useQueryClient();
+  const [mode, setMode] = useState<Mode>("dashboard");
   const [selected, setSelected] = useState<string>("");
   const [granted, setGranted] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState(false);
@@ -15,70 +18,135 @@ export default function AdminPermissions() {
     queryKey: ["admin-dashboards"],
     queryFn: async () => (await api.get<Dashboard[]>("/api/dashboards")).data,
   });
-
   const users = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => (await api.get<User[]>("/api/users")).data,
   });
 
+  // The endpoint differs by mode: a dashboard's user-grants, or a user's dashboard-grants.
+  const permsPath =
+    mode === "dashboard"
+      ? `/api/dashboards/${selected}/permissions`
+      : `/api/users/${selected}/permissions`;
+
   const perms = useQuery({
-    queryKey: ["dashboard-perms", selected],
+    queryKey: ["perms", mode, selected],
     enabled: !!selected,
-    queryFn: async () =>
-      (await api.get<string[]>(`/api/dashboards/${selected}/permissions`)).data,
+    queryFn: async () => (await api.get<string[]>(permsPath)).data,
   });
 
   useEffect(() => {
     if (perms.data) setGranted(new Set(perms.data));
   }, [perms.data]);
 
-  // Default to first dashboard once loaded.
+  // The list of things you pick from (left selector).
+  const subjects =
+    mode === "dashboard"
+      ? (dashboards.data ?? []).map((d) => ({ id: d.id, label: d.name }))
+      : (users.data ?? [])
+          .filter((u) => u.role !== "admin")
+          .map((u) => ({ id: u.id, label: u.display_name || u.email }));
+
+  // Default selection to the first subject when the list or mode changes.
   useEffect(() => {
-    if (!selected && dashboards.data && dashboards.data.length > 0) {
-      setSelected(dashboards.data[0].id);
+    if (subjects.length > 0 && !subjects.some((s) => s.id === selected)) {
+      setSelected(subjects[0].id);
     }
-  }, [dashboards.data, selected]);
+    if (subjects.length === 0) setSelected("");
+  }, [mode, dashboards.data, users.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = useMutation({
-    mutationFn: async () =>
-      api.put(`/api/dashboards/${selected}/permissions`, { ids: Array.from(granted) }),
+    mutationFn: async () => api.put(permsPath, { ids: Array.from(granted) }),
     onSuccess: () => {
       setSaved(true);
-      qc.invalidateQueries({ queryKey: ["dashboard-perms", selected] });
+      qc.invalidateQueries({ queryKey: ["perms", mode, selected] });
       setTimeout(() => setSaved(false), 2000);
     },
   });
 
-  function toggle(userId: string) {
+  function toggle(id: string) {
     setGranted((prev) => {
       const next = new Set(prev);
-      next.has(userId) ? next.delete(userId) : next.add(userId);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   }
 
+  function switchMode(m: Mode) {
+    if (m === mode) return;
+    setMode(m);
+    setSelected("");
+    setGranted(new Set());
+  }
+
   if (dashboards.isLoading || users.isLoading) return <FullSpinner />;
 
-  const regularUsers = users.data?.filter((u) => u.role !== "admin") ?? [];
+  // The list of toggleable targets (right side).
+  const targets: { id: string; title: string; subtitle: string; badge?: Dashboard["type"] }[] =
+    mode === "dashboard"
+      ? (users.data ?? [])
+          .filter((u) => u.role !== "admin")
+          .map((u) => ({ id: u.id, title: u.display_name || u.email, subtitle: u.email }))
+      : (dashboards.data ?? []).map((d) => ({
+          id: d.id,
+          title: d.name,
+          subtitle: d.description || (d.type === "excel" ? "Excel" : "HTML"),
+          badge: d.type,
+        }));
+
+  const selectorLabel = mode === "dashboard" ? "Dashboard" : "Usuario";
+  const grantedCount = granted.size;
 
   return (
     <div className="space-y-5">
-      <div className="card p-5">
-        <label className="label">Dashboard</label>
-        <select
-          className="input max-w-md"
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
+      {/* Mode toggle */}
+      <div className="inline-flex gap-1 rounded-xl border border-border bg-surface p-1 shadow-soft">
+        <button
+          onClick={() => switchMode("dashboard")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+            mode === "dashboard" ? "bg-primary text-primary-fg" : "text-muted-fg hover:bg-muted"
+          }`}
         >
-          {dashboards.data?.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+          <LayoutDashboard className="h-4 w-4" />
+          Por dashboard
+        </button>
+        <button
+          onClick={() => switchMode("user")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+            mode === "user" ? "bg-primary text-primary-fg" : "text-muted-fg hover:bg-muted"
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          Por usuario
+        </button>
+      </div>
+
+      <div className="card p-5">
+        <label className="label">{selectorLabel}</label>
+        {subjects.length === 0 ? (
+          <p className="text-sm text-muted-fg">
+            {mode === "dashboard"
+              ? "No hay dashboards todavía."
+              : "No hay usuarios (no administradores) a quienes asignar acceso."}
+          </p>
+        ) : (
+          <select
+            className="input max-w-md"
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        )}
         <p className="mt-2 text-sm text-muted-fg">
-          Marca los usuarios que pueden ver este dashboard. Los administradores ven todo
-          automáticamente.
+          {mode === "dashboard"
+            ? "Marca los usuarios que pueden ver este dashboard."
+            : "Marca los dashboards que este usuario puede ver."}{" "}
+          Los administradores ven todo automáticamente.
         </p>
       </div>
 
@@ -88,27 +156,36 @@ export default function AdminPermissions() {
             <div className="p-8">
               <FullSpinner />
             </div>
-          ) : regularUsers.length === 0 ? (
+          ) : targets.length === 0 ? (
             <div className="p-8 text-center text-muted-fg">
-              No hay usuarios (no administradores) a quienes asignar acceso.
+              {mode === "dashboard"
+                ? "No hay usuarios a quienes asignar acceso."
+                : "No hay dashboards para asignar."}
             </div>
           ) : (
             <ul className="divide-y divide-border">
-              {regularUsers.map((u) => {
-                const on = granted.has(u.id);
+              {targets.map((t) => {
+                const on = granted.has(t.id);
                 return (
-                  <li key={u.id}>
+                  <li key={t.id}>
                     <button
-                      onClick={() => toggle(u.id)}
+                      onClick={() => toggle(t.id)}
                       className="flex w-full items-center justify-between px-5 py-3.5 text-left hover:bg-muted"
                     >
-                      <div>
-                        <div className="font-medium text-fg">{u.display_name || u.email}</div>
-                        <div className="text-sm text-muted-fg">{u.email}</div>
+                      <div className="flex items-center gap-2.5">
+                        <div>
+                          <div className="flex items-center gap-2 font-medium text-fg">
+                            {t.title}
+                            {t.badge && <TypeBadge type={t.badge} />}
+                          </div>
+                          <div className="text-sm text-muted-fg">{t.subtitle}</div>
+                        </div>
                       </div>
                       <span
                         className={`flex h-6 w-6 items-center justify-center rounded-md border ${
-                          on ? "border-primary bg-primary text-primary-fg" : "border-border bg-surface"
+                          on
+                            ? "border-primary bg-primary text-primary-fg"
+                            : "border-border bg-surface"
                         }`}
                       >
                         {on && <Check className="h-4 w-4" />}
@@ -119,16 +196,22 @@ export default function AdminPermissions() {
               })}
             </ul>
           )}
-          <div className="flex items-center justify-end gap-3 border-t border-border bg-muted/40 px-5 py-3">
-            {saved && <span className="text-sm text-success">Guardado</span>}
-            <button
-              className="btn-primary"
-              onClick={() => save.mutate()}
-              disabled={save.isPending}
-            >
-              {save.isPending ? <Spinner className="border-primary-fg" /> : <Save className="h-4 w-4" />}
-              Guardar permisos
-            </button>
+          <div className="flex items-center justify-between gap-3 border-t border-border bg-muted/40 px-5 py-3">
+            <span className="flex items-center gap-1.5 text-sm text-muted-fg">
+              <KeyRound className="h-3.5 w-3.5" />
+              {grantedCount} con acceso
+            </span>
+            <div className="flex items-center gap-3">
+              {saved && <span className="text-sm text-success">Guardado</span>}
+              <button className="btn-primary" onClick={() => save.mutate()} disabled={save.isPending}>
+                {save.isPending ? (
+                  <Spinner className="border-primary-fg" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Guardar
+              </button>
+            </div>
           </div>
         </div>
       )}

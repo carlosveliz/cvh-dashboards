@@ -57,6 +57,15 @@ export interface ContentToken {
   src: string;
 }
 
+export interface DashboardVersion {
+  id: string;
+  version_no: number;
+  file_name: string | null;
+  file_size: number | null;
+  uploaded_at: string;
+  is_current: boolean;
+}
+
 export interface AuditEvent {
   id: string;
   created_at: string;

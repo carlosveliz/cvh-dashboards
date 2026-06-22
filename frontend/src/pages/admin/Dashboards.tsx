@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, Upload } from "lucide-react";
+import { History, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
 import { FormEvent, useRef, useState } from "react";
 import { api } from "../../api/client";
-import type { Dashboard, DashboardType, Visibility } from "../../api/types";
+import type { Dashboard, DashboardType, DashboardVersion, Visibility } from "../../api/types";
 import { ErrorText, FullSpinner, Modal, Spinner, TypeBadge } from "../../components/ui";
 
 const VISIBILITIES: { value: Visibility; label: string }[] = [
@@ -15,6 +15,7 @@ const VISIBILITIES: { value: Visibility; label: string }[] = [
 export default function AdminDashboards() {
   const qc = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
+  const [versionsFor, setVersionsFor] = useState<Dashboard | null>(null);
   const [uploadError, setUploadError] = useState<Record<string, string>>({});
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -102,6 +103,14 @@ export default function AdminDashboards() {
               Subir {d.type === "excel" ? ".xlsx" : ".html"}
             </button>
             <button
+              className="btn-ghost p-2.5"
+              onClick={() => setVersionsFor(d)}
+              disabled={!d.has_content}
+              title="Versiones"
+            >
+              <History className="h-4 w-4" />
+            </button>
+            <button
               className="btn-ghost p-2.5 text-danger"
               onClick={() => {
                 if (confirm(`¿Eliminar "${d.name}"?`)) remove.mutate(d.id);
@@ -122,7 +131,92 @@ export default function AdminDashboards() {
           qc.invalidateQueries({ queryKey: ["admin-dashboards"] });
         }}
       />
+
+      <VersionsModal
+        dashboard={versionsFor}
+        onClose={() => setVersionsFor(null)}
+        onRestored={() => qc.invalidateQueries({ queryKey: ["admin-dashboards"] })}
+      />
     </div>
+  );
+}
+
+function fmtSize(bytes: number | null): string {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function VersionsModal({
+  dashboard,
+  onClose,
+  onRestored,
+}: {
+  dashboard: Dashboard | null;
+  onClose: () => void;
+  onRestored: () => void;
+}) {
+  const qc = useQueryClient();
+  const id = dashboard?.id;
+
+  const versions = useQuery({
+    queryKey: ["dashboard-versions", id],
+    enabled: !!id,
+    queryFn: async () =>
+      (await api.get<DashboardVersion[]>(`/api/dashboards/${id}/versions`)).data,
+  });
+
+  const restore = useMutation({
+    mutationFn: async (versionId: string) =>
+      api.post(`/api/dashboards/${id}/versions/${versionId}/restore`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["dashboard-versions", id] });
+      onRestored();
+    },
+  });
+
+  return (
+    <Modal open={!!dashboard} onClose={onClose} title={`Versiones — ${dashboard?.name ?? ""}`}>
+      {versions.isLoading ? (
+        <div className="py-8">
+          <FullSpinner />
+        </div>
+      ) : !versions.data || versions.data.length === 0 ? (
+        <p className="py-6 text-center text-muted-fg">Aún no hay versiones.</p>
+      ) : (
+        <ul className="divide-y divide-border">
+          {versions.data.map((v) => (
+            <li key={v.id} className="flex items-center justify-between gap-3 py-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-fg">v{v.version_no}</span>
+                  {v.is_current && (
+                    <span className="badge bg-success-soft text-success">Actual</span>
+                  )}
+                </div>
+                <div className="truncate text-sm text-muted-fg">
+                  {v.file_name || "—"} · {fmtSize(v.file_size)} ·{" "}
+                  {new Date(v.uploaded_at).toLocaleString("es")}
+                </div>
+              </div>
+              <button
+                className="btn-outline shrink-0"
+                disabled={v.is_current || restore.isPending}
+                onClick={() => restore.mutate(v.id)}
+              >
+                {restore.isPending && restore.variables === v.id ? (
+                  <Spinner />
+                ) : (
+                  <RotateCcw className="h-4 w-4" />
+                )}
+                Restaurar
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Modal>
   );
 }
 

@@ -7,11 +7,15 @@ from slowapi.errors import RateLimitExceeded
 
 from . import models  # noqa: F401  (register models on Base.metadata)
 from .config import settings
+from .observability import RequestLogMiddleware, configure_logging, init_sentry
 from .routers import auth, content, dashboards, users
 from .seed import seed_admin
 from .security.limiter import limiter
 from .startup import check_secret_key, start_cleanup_loop
 from .services.storage import ensure_upload_dir
+
+configure_logging()
+init_sentry()
 
 
 @asynccontextmanager
@@ -29,6 +33,7 @@ app = FastAPI(title="CVH Dashboards", lifespan=lifespan)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(RequestLogMiddleware)
 
 # CORS only matters in dev where the Vite server is on a different origin.
 # In production the frontend proxies /api to the backend (same origin).

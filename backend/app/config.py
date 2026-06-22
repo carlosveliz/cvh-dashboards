@@ -34,6 +34,10 @@ class Settings(BaseSettings):
 
     app_base_url: str = "http://localhost:8080"
 
+    # Observability
+    app_env: str = "production"
+    sentry_dsn: str = ""
+
     @property
     def smtp_enabled(self) -> bool:
         return bool(self.smtp_host)

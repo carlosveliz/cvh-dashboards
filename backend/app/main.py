@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import models  # noqa: F401  (register models on Base.metadata)
 from .config import settings
-from .db import Base, engine
 from .routers import auth, content, dashboards, users
 from .seed import seed_admin
 from .services.storage import ensure_upload_dir
@@ -13,8 +12,7 @@ from .services.storage import ensure_upload_dir
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Schema is managed by Alembic (run in the container entrypoint), not here.
     ensure_upload_dir()
     await seed_admin()
     yield

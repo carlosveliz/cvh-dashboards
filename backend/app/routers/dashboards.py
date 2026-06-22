@@ -6,6 +6,7 @@ from fastapi import (
     Depends,
     File,
     HTTPException,
+    Request,
     UploadFile,
     status,
 )
@@ -24,7 +25,7 @@ from ..schemas import (
 from ..schemas.dashboard import ExcelData
 from ..security.deps import get_current_user, require_admin, user_has_access, verify_csrf
 from ..security.tokens import make_content_token
-from ..services import storage
+from ..services import audit, storage
 from ..services.excel_renderer import render_excel
 
 router = APIRouter(prefix="/api/dashboards", tags=["dashboards"])
@@ -90,6 +91,7 @@ async def get_dashboard(
 @router.get("/{dashboard_id}/content-token")
 async def content_token(
     dashboard_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -101,12 +103,17 @@ async def content_token(
     if not d.file_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sin contenido")
     token = make_content_token(d.id, user.id)
+    await audit.record(
+        event_type=audit.DASHBOARD_VIEW, request=request, user=user,
+        target_type="dashboard", target_id=d.id, target_label=d.name,
+    )
     return {"token": token, "src": f"/dash/{d.slug}?t={token}"}
 
 
 @router.get("/{dashboard_id}/data", response_model=ExcelData)
 async def excel_data(
     dashboard_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -118,6 +125,10 @@ async def excel_data(
     if not d.file_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sin contenido")
     raw = storage.read_file(d.file_path)
+    await audit.record(
+        event_type=audit.DASHBOARD_VIEW, request=request, user=user,
+        target_type="dashboard", target_id=d.id, target_label=d.name,
+    )
     return render_excel(raw)
 
 
@@ -131,6 +142,7 @@ async def excel_data(
 )
 async def create_dashboard(
     payload: DashboardCreate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
@@ -151,6 +163,11 @@ async def create_dashboard(
     db.add(d)
     await db.commit()
     await db.refresh(d)
+    await audit.record(
+        event_type=audit.DASHBOARD_CREATE, request=request, user=admin,
+        target_type="dashboard", target_id=d.id, target_label=d.name,
+        meta={"type": d.type},
+    )
     return _to_read(d)
 
 
@@ -158,6 +175,7 @@ async def create_dashboard(
 async def update_dashboard(
     dashboard_id: uuid.UUID,
     payload: DashboardUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
@@ -170,6 +188,10 @@ async def update_dashboard(
         d.visibility = payload.visibility
     await db.commit()
     await db.refresh(d)
+    await audit.record(
+        event_type=audit.DASHBOARD_UPDATE, request=request, user=admin,
+        target_type="dashboard", target_id=d.id, target_label=d.name,
+    )
     return _to_read(d)
 
 
@@ -180,18 +202,25 @@ async def update_dashboard(
 )
 async def delete_dashboard(
     dashboard_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
     d = await _get_or_404(db, dashboard_id)
+    label = d.name
     storage.delete_file(d.file_path)
     await db.delete(d)
     await db.commit()
+    await audit.record(
+        event_type=audit.DASHBOARD_DELETE, request=request, user=admin,
+        target_type="dashboard", target_id=dashboard_id, target_label=label,
+    )
 
 
 @router.post("/{dashboard_id}/upload", response_model=DashboardRead, dependencies=[Depends(verify_csrf)])
 async def upload_content(
     dashboard_id: uuid.UUID,
+    request: Request,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
@@ -227,6 +256,11 @@ async def upload_content(
     d.uploaded_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(d)
+    await audit.record(
+        event_type=audit.DASHBOARD_UPLOAD, request=request, user=admin,
+        target_type="dashboard", target_id=d.id, target_label=d.name,
+        meta={"file_name": d.file_name, "size": size},
+    )
     return _to_read(d)
 
 
@@ -248,10 +282,11 @@ async def get_dashboard_permissions(
 async def set_dashboard_permissions(
     dashboard_id: uuid.UUID,
     payload: PermissionSet,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    await _get_or_404(db, dashboard_id)
+    d = await _get_or_404(db, dashboard_id)
     await db.execute(delete(DashboardAccess).where(DashboardAccess.dashboard_id == dashboard_id))
     for user_id in set(payload.ids):
         db.add(DashboardAccess(user_id=user_id, dashboard_id=dashboard_id, granted_by=admin.id))
@@ -259,4 +294,10 @@ async def set_dashboard_permissions(
     result = await db.execute(
         select(DashboardAccess.user_id).where(DashboardAccess.dashboard_id == dashboard_id)
     )
-    return [row[0] for row in result.all()]
+    user_ids = [row[0] for row in result.all()]
+    await audit.record(
+        event_type=audit.ACCESS_SET, request=request, user=admin,
+        target_type="dashboard", target_id=dashboard_id, target_label=d.name,
+        meta={"subject": "dashboard", "user_ids": [str(u) for u in user_ids]},
+    )
+    return user_ids

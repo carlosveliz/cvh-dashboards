@@ -16,6 +16,7 @@ from ..security.tokens import (
     generate_opaque_token,
     refresh_expiry,
 )
+from ..services import audit
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -51,10 +52,19 @@ async def login(
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if user is None or not user.password_hash or not verify_password(payload.password, user.password_hash):
+        await audit.record(
+            event_type=audit.LOGIN_FAILED, request=request,
+            actor_email=email, meta={"reason": "bad_credentials"},
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
     if not user.is_active:
+        await audit.record(
+            event_type=audit.LOGIN_FAILED, request=request, user=user,
+            actor_email=email, meta={"reason": "inactive"},
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cuenta inactiva")
     await _issue_session(db, response, user)
+    await audit.record(event_type=audit.LOGIN_SUCCESS, request=request, user=user)
     return MeResponse(id=user.id, email=user.email, role=user.role, display_name=user.display_name)
 
 
@@ -90,6 +100,7 @@ async def logout(request: Request, response: Response, db: AsyncSession = Depend
         if rt and rt.revoked_at is None:
             rt.revoked_at = datetime.now(timezone.utc)
             await db.commit()
+            await audit.record(event_type=audit.LOGOUT, request=request, user=await db.get(User, rt.user_id))
     clear_auth_cookies(response)
     return {"ok": True}
 
@@ -128,4 +139,5 @@ async def accept_invite(
     await db.commit()
     await db.refresh(user)
     await _issue_session(db, response, user)
+    await audit.record(event_type=audit.INVITE_ACCEPT, request=request, user=user)
     return MeResponse(id=user.id, email=user.email, role=user.role, display_name=user.display_name)

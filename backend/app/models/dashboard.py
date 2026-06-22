@@ -18,6 +18,8 @@ class Dashboard(Base):
     type: Mapped[str] = mapped_column(String(16), nullable=False)
     # UI hint only: 'restricted' | 'internal' | 'external' | 'personal'
     visibility: Mapped[str] = mapped_column(String(16), default="restricted", nullable=False)
+    # Optional folder/group shown in the launcher (null -> "General").
+    group_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     file_path: Mapped[str | None] = mapped_column(String, nullable=True)
     file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)

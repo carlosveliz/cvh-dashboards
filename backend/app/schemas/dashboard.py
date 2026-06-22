@@ -17,6 +17,7 @@ class DashboardRead(BaseModel):
     description: str | None = None
     type: str
     visibility: str
+    group_name: str | None = None
     file_name: str | None = None
     has_content: bool = False
     uploaded_at: datetime | None = None
@@ -28,12 +29,14 @@ class DashboardCreate(BaseModel):
     description: str | None = None
     type: DashboardType
     visibility: Visibility = "restricted"
+    group_name: str | None = Field(default=None, max_length=120)
 
 
 class DashboardUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=255)
     description: str | None = None
     visibility: Visibility | None = None
+    group_name: str | None = Field(default=None, max_length=120)
 
 
 class PermissionSet(BaseModel):

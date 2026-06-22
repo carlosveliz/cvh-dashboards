@@ -3,6 +3,7 @@ from .audit import AuditLog
 from .dashboard import Dashboard
 from .dashboard_version import DashboardVersion
 from .invitation import Invitation
+from .password_reset import PasswordReset
 from .refresh_token import RefreshToken
 from .user import User
 
@@ -14,4 +15,5 @@ __all__ = [
     "RefreshToken",
     "AuditLog",
     "DashboardVersion",
+    "PasswordReset",
 ]

@@ -1,7 +1,9 @@
 from .auth import (
     AcceptInvite,
+    ForgotPassword,
     LoginRequest,
     MeResponse,
+    ResetPassword,
 )
 from .dashboard import (
     DashboardCreate,
@@ -23,6 +25,8 @@ __all__ = [
     "LoginRequest",
     "MeResponse",
     "AcceptInvite",
+    "ForgotPassword",
+    "ResetPassword",
     "UserCreate",
     "UserRead",
     "UserUpdate",

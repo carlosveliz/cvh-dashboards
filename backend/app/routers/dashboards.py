@@ -47,6 +47,7 @@ def _to_read(d: Dashboard) -> DashboardRead:
         description=d.description,
         type=d.type,
         visibility=d.visibility,
+        group_name=d.group_name,
         file_name=d.file_name,
         has_content=bool(d.file_path),
         uploaded_at=d.uploaded_at,
@@ -161,6 +162,7 @@ async def create_dashboard(
         description=payload.description,
         type=payload.type,
         visibility=payload.visibility,
+        group_name=payload.group_name,
         created_by=admin.id,
     )
     db.add(d)
@@ -189,6 +191,8 @@ async def update_dashboard(
         d.description = payload.description
     if payload.visibility is not None:
         d.visibility = payload.visibility
+    if payload.group_name is not None:
+        d.group_name = payload.group_name or None
     await db.commit()
     await db.refresh(d)
     await audit.record(

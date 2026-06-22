@@ -7,6 +7,7 @@ from .dashboard import (
     DashboardCreate,
     DashboardRead,
     DashboardUpdate,
+    DashboardVersionRead,
     ExcelData,
     PermissionSet,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "DashboardCreate",
     "DashboardRead",
     "DashboardUpdate",
+    "DashboardVersionRead",
     "PermissionSet",
     "ExcelData",
 ]

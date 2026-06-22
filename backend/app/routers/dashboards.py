@@ -1,5 +1,6 @@
 import re
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import (
     APIRouter,
@@ -10,23 +11,25 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..db import get_db
-from ..models import Dashboard, DashboardAccess, User
+from ..models import Dashboard, DashboardAccess, DashboardVersion, User
 from ..schemas import (
     DashboardCreate,
     DashboardRead,
     DashboardUpdate,
     PermissionSet,
 )
-from ..schemas.dashboard import ExcelData
+from ..schemas.dashboard import DashboardVersionRead, ExcelData
 from ..security.deps import get_current_user, require_admin, user_has_access, verify_csrf
 from ..security.tokens import make_content_token
 from ..services import audit, storage
 from ..services.excel_renderer import render_excel
+
+MAX_VERSIONS = 10
 
 router = APIRouter(prefix="/api/dashboards", tags=["dashboards"])
 
@@ -246,22 +249,57 @@ async def upload_content(
         except Exception:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se pudo leer el Excel")
 
-    rel_path, size, digest = storage.save_upload(d.id, d.type, raw)
-    from datetime import datetime, timezone
+    # Next version number for this dashboard.
+    last_no = await db.scalar(
+        select(func.max(DashboardVersion.version_no)).where(
+            DashboardVersion.dashboard_id == d.id
+        )
+    )
+    version_no = (last_no or 0) + 1
+    rel_path, size, digest = storage.save_version(d.id, d.type, raw, version_no)
 
+    db.add(
+        DashboardVersion(
+            dashboard_id=d.id,
+            version_no=version_no,
+            file_path=rel_path,
+            file_name=file.filename,
+            file_size=size,
+            content_hash=digest,
+            uploaded_by=admin.id,
+        )
+    )
+    # Point the dashboard at the new active version.
     d.file_path = rel_path
     d.file_name = file.filename
     d.file_size = size
     d.content_hash = digest
     d.uploaded_at = datetime.now(timezone.utc)
     await db.commit()
+
+    await _prune_versions(db, d.id)
     await db.refresh(d)
     await audit.record(
         event_type=audit.DASHBOARD_UPLOAD, request=request, user=admin,
         target_type="dashboard", target_id=d.id, target_label=d.name,
-        meta={"file_name": d.file_name, "size": size},
+        meta={"file_name": d.file_name, "size": size, "version": version_no},
     )
     return _to_read(d)
+
+
+async def _prune_versions(db: AsyncSession, dashboard_id: uuid.UUID) -> None:
+    """Keep only the most recent MAX_VERSIONS versions; delete older files+rows."""
+    rows = await db.execute(
+        select(DashboardVersion)
+        .where(DashboardVersion.dashboard_id == dashboard_id)
+        .order_by(DashboardVersion.version_no.desc())
+    )
+    versions = list(rows.scalars().all())
+    for old in versions[MAX_VERSIONS:]:
+        storage.delete_file(old.file_path)
+        await db.delete(old)
+    if len(versions) > MAX_VERSIONS:
+        await db.commit()
 
 
 # ---------- Permissions (admin) ----------
@@ -301,3 +339,63 @@ async def set_dashboard_permissions(
         meta={"subject": "dashboard", "user_ids": [str(u) for u in user_ids]},
     )
     return user_ids
+
+
+# ---------- Versions (admin) ----------
+
+@router.get("/{dashboard_id}/versions", response_model=list[DashboardVersionRead])
+async def list_versions(
+    dashboard_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    d = await _get_or_404(db, dashboard_id)
+    rows = await db.execute(
+        select(DashboardVersion)
+        .where(DashboardVersion.dashboard_id == dashboard_id)
+        .order_by(DashboardVersion.version_no.desc())
+    )
+    versions = rows.scalars().all()
+    return [
+        DashboardVersionRead(
+            id=v.id,
+            version_no=v.version_no,
+            file_name=v.file_name,
+            file_size=v.file_size,
+            uploaded_at=v.uploaded_at,
+            is_current=(v.file_path == d.file_path),
+        )
+        for v in versions
+    ]
+
+
+@router.post(
+    "/{dashboard_id}/versions/{version_id}/restore",
+    response_model=DashboardRead,
+    dependencies=[Depends(verify_csrf)],
+)
+async def restore_version(
+    dashboard_id: uuid.UUID,
+    version_id: uuid.UUID,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    d = await _get_or_404(db, dashboard_id)
+    v = await db.get(DashboardVersion, version_id)
+    if v is None or v.dashboard_id != dashboard_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Versión no encontrada")
+    # Repoint the dashboard to this version's stored file (no new file created).
+    d.file_path = v.file_path
+    d.file_name = v.file_name
+    d.file_size = v.file_size
+    d.content_hash = v.content_hash
+    d.uploaded_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(d)
+    await audit.record(
+        event_type=audit.DASHBOARD_UPDATE, request=request, user=admin,
+        target_type="dashboard", target_id=d.id, target_label=d.name,
+        meta={"restored_from_version": v.version_no},
+    )
+    return _to_read(d)

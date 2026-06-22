@@ -42,6 +42,17 @@ class PermissionSet(BaseModel):
     ids: list[uuid.UUID]
 
 
+class DashboardVersionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    version_no: int
+    file_name: str | None = None
+    file_size: int | None = None
+    uploaded_at: datetime
+    is_current: bool = False
+
+
 class ExcelSheet(BaseModel):
     name: str
     columns: list[str]

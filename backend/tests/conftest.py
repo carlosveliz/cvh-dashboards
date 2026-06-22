@@ -21,6 +21,7 @@ from app import models  # noqa: E402,F401  (register tables on Base.metadata)
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed import seed_admin  # noqa: E402
+from app.security.limiter import limiter  # noqa: E402
 
 
 async def _create_schema():
@@ -37,6 +38,12 @@ asyncio.run(_create_schema())
 @pytest_asyncio.fixture(autouse=True)
 async def _clean():
     """Truncate everything after each test so tests are independent."""
+    # The rate limiter is in-memory and shared across the session; reset it so
+    # accumulated logins from earlier tests don't trip the 5/min cap.
+    try:
+        limiter.reset()
+    except Exception:
+        pass
     yield
     async with engine.begin() as conn:
         for table in reversed(Base.metadata.sorted_tables):

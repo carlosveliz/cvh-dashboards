@@ -16,12 +16,17 @@ def _ext_for_type(dashboard_type: str) -> str:
     return ".html" if dashboard_type == "static_html" else ".xlsx"
 
 
-def save_upload(dashboard_id: uuid.UUID, dashboard_type: str, data: bytes) -> tuple[str, int, str]:
-    """Save bytes to the uploads volume. Returns (relative_path, size, sha256)."""
+def save_version(
+    dashboard_id: uuid.UUID, dashboard_type: str, data: bytes, version_no: int
+) -> tuple[str, int, str]:
+    """Save one version to the uploads volume. Returns (relative_path, size, sha256).
+
+    Each version is a distinct file (`{id}-v{n}.ext`) so restoring an older
+    version only repoints the dashboard — no file is rewritten. The filename is
+    derived from the dashboard id (never user input), so there is no traversal."""
     ensure_upload_dir()
     ext = _ext_for_type(dashboard_type)
-    # Internal filename is derived from the dashboard id (never user input) -> no traversal.
-    filename = f"{dashboard_id}{ext}"
+    filename = f"{dashboard_id}-v{version_no}{ext}"
     target = UPLOAD_DIR / filename
     target.write_bytes(data)
     digest = hashlib.sha256(data).hexdigest()

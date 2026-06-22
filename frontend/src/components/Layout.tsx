@@ -25,10 +25,11 @@ export function Layout({ children }: { children: ReactNode }) {
             {user?.role === "admin" && (
               <Link
                 to="/admin"
-                className={`btn-ghost ${onAdmin ? "bg-muted" : ""}`}
+                title="Administración"
+                aria-label="Administración"
+                className={`btn-ghost p-2.5 ${onAdmin ? "bg-muted" : ""}`}
               >
                 <Settings className="h-4 w-4" />
-                <span className="hidden sm:inline">Administración</span>
               </Link>
             )}
             <div className="mx-1.5 hidden text-right sm:block">

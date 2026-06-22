@@ -2,11 +2,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from . import models  # noqa: F401  (register models on Base.metadata)
 from .config import settings
 from .routers import auth, content, dashboards, users
 from .seed import seed_admin
+from .security.limiter import limiter
 from .startup import check_secret_key
 from .services.storage import ensure_upload_dir
 
@@ -21,6 +24,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="CVH Dashboards", lifespan=lifespan)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS only matters in dev where the Vite server is on a different origin.
 # In production the frontend proxies /api to the backend (same origin).

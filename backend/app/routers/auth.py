@@ -10,6 +10,7 @@ from ..schemas import AcceptInvite, LoginRequest, MeResponse
 from ..security.cookies import clear_auth_cookies, set_auth_cookies
 from ..security.deps import REFRESH_COOKIE, get_current_user
 from ..security.hashing import hash_password, sha256_hex, verify_password
+from ..security.limiter import limiter
 from ..security.tokens import (
     create_access_token,
     generate_opaque_token,
@@ -39,7 +40,13 @@ async def _issue_session(db: AsyncSession, response: Response, user: User) -> No
 
 
 @router.post("/login", response_model=MeResponse)
-async def login(payload: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login(
+    request: Request,
+    payload: LoginRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     email = payload.email.lower().strip()
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
@@ -93,7 +100,13 @@ async def me(user: User = Depends(get_current_user)):
 
 
 @router.post("/invite/accept", response_model=MeResponse)
-async def accept_invite(payload: AcceptInvite, response: Response, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def accept_invite(
+    request: Request,
+    payload: AcceptInvite,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     token_hash = sha256_hex(payload.token)
     result = await db.execute(select(Invitation).where(Invitation.token_hash == token_hash))
     inv = result.scalar_one_or_none()

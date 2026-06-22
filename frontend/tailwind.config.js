@@ -17,7 +17,9 @@ export default {
         accent: "hsl(var(--accent))",
         "accent-soft": "hsl(var(--accent-soft))",
         success: "hsl(var(--success))",
+        "success-soft": "hsl(var(--success-soft))",
         danger: "hsl(var(--danger))",
+        "danger-soft": "hsl(var(--danger-soft))",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],

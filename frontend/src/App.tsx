@@ -6,6 +6,7 @@ import DashboardViewer from "./pages/DashboardViewer";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import AdminLayout from "./pages/admin/AdminLayout";
+import AdminAudit from "./pages/admin/Audit";
 import AdminDashboards from "./pages/admin/Dashboards";
 import AdminPermissions from "./pages/admin/Permissions";
 import AdminUsers from "./pages/admin/Users";
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="dashboards" element={<AdminDashboards />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="permissions" element={<AdminPermissions />} />
+        <Route path="audit" element={<AdminAudit />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

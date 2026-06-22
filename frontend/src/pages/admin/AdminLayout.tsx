@@ -1,4 +1,4 @@
-import { KeyRound, LayoutDashboard, Users } from "lucide-react";
+import { Activity, KeyRound, LayoutDashboard, Users } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { Layout } from "../../components/Layout";
 
@@ -6,6 +6,7 @@ const tabs = [
   { to: "/admin/dashboards", label: "Dashboards", icon: LayoutDashboard },
   { to: "/admin/users", label: "Usuarios", icon: Users },
   { to: "/admin/permissions", label: "Permisos", icon: KeyRound },
+  { to: "/admin/audit", label: "Actividad", icon: Activity },
 ];
 
 export default function AdminLayout() {

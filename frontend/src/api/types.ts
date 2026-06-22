@@ -56,3 +56,29 @@ export interface ContentToken {
   token: string;
   src: string;
 }
+
+export interface AuditEvent {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  actor_email: string | null;
+  event_type: string;
+  target_type: string | null;
+  target_id: string | null;
+  target_label: string | null;
+  ip: string | null;
+  user_agent: string | null;
+  meta: Record<string, unknown> | null;
+}
+
+export interface AuditPage {
+  items: AuditEvent[];
+  total: number;
+}
+
+export interface AuditSummary {
+  logins_7d: number;
+  failed_logins_7d: number;
+  active_users_7d: number;
+  top_dashboards: { id: string; name: string; views: number }[];
+}

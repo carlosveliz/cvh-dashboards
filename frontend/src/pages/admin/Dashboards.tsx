@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BarChart3, History, Plus, RotateCcw, Trash2, Upload } from "lucide-react";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import {
+  BarChart3,
+  FolderOpen,
+  History,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+  Upload,
+} from "lucide-react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api/client";
 import type {
   ChartType,
@@ -11,6 +20,13 @@ import type {
   Visibility,
 } from "../../api/types";
 import { ErrorText, FullSpinner, Modal, Spinner, TypeBadge } from "../../components/ui";
+
+const VISIBILITY_LABELS: Record<Visibility, string> = {
+  restricted: "Restringido",
+  internal: "Interno",
+  external: "Externo",
+  personal: "Personal (solo admin)",
+};
 
 const VISIBILITIES: { value: Visibility; label: string }[] = [
   { value: "restricted", label: "Restringido" },
@@ -24,6 +40,7 @@ export default function AdminDashboards() {
   const [showCreate, setShowCreate] = useState(false);
   const [versionsFor, setVersionsFor] = useState<Dashboard | null>(null);
   const [chartFor, setChartFor] = useState<Dashboard | null>(null);
+  const [editing, setEditing] = useState<Dashboard | null>(null);
   const [uploadError, setUploadError] = useState<Record<string, string>>({});
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -31,6 +48,13 @@ export default function AdminDashboards() {
     queryKey: ["admin-dashboards"],
     queryFn: async () => (await api.get<Dashboard[]>("/api/dashboards")).data,
   });
+
+  // Existing folder names, for the move/create-folder suggestions.
+  const folders = useMemo(
+    () =>
+      [...new Set((data ?? []).map((d) => d.group_name).filter(Boolean))].sort() as string[],
+    [data],
+  );
 
   const remove = useMutation({
     mutationFn: async (id: string) => api.delete(`/api/dashboards/${id}`),
@@ -80,10 +104,16 @@ export default function AdminDashboards() {
         {data?.map((d) => (
           <div key={d.id} className="card flex flex-wrap items-center gap-4 p-4">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-fg">{d.name}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-fg">{d.name}</span>
                 <TypeBadge type={d.type} />
-                <span className="badge bg-muted text-muted-fg">{d.visibility}</span>
+                <span className="badge bg-muted text-muted-fg">
+                  {VISIBILITY_LABELS[d.visibility] ?? d.visibility}
+                </span>
+                <span className="badge inline-flex items-center gap-1 bg-primary-soft text-primary">
+                  <FolderOpen className="h-3 w-3" />
+                  {d.group_name || "General"}
+                </span>
               </div>
               <div className="mt-0.5 text-sm text-muted-fg">
                 {d.has_content ? `Archivo: ${d.file_name}` : "Sin contenido"}
@@ -109,6 +139,13 @@ export default function AdminDashboards() {
                 <Upload className="h-4 w-4" />
               )}
               Subir {d.type === "excel" ? ".xlsx" : ".html"}
+            </button>
+            <button
+              className="btn-ghost p-2.5"
+              onClick={() => setEditing(d)}
+              title="Editar / mover de carpeta"
+            >
+              <Pencil className="h-4 w-4" />
             </button>
             {d.type === "excel" && (
               <button
@@ -161,7 +198,125 @@ export default function AdminDashboards() {
         onClose={() => setChartFor(null)}
         onSaved={() => qc.invalidateQueries({ queryKey: ["admin-dashboards"] })}
       />
+
+      <EditModal
+        dashboard={editing}
+        folders={folders}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          setEditing(null);
+          qc.invalidateQueries({ queryKey: ["admin-dashboards"] });
+          qc.invalidateQueries({ queryKey: ["dashboards"] });
+        }}
+      />
     </div>
+  );
+}
+
+function EditModal({
+  dashboard,
+  folders,
+  onClose,
+  onSaved,
+}: {
+  dashboard: Dashboard | null;
+  folders: string[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [group, setGroup] = useState("");
+  const [visibility, setVisibility] = useState<Visibility>("restricted");
+  const [error, setError] = useState("");
+
+  // Seed the form whenever a new dashboard is opened.
+  useEffect(() => {
+    if (dashboard) {
+      setName(dashboard.name);
+      setDescription(dashboard.description || "");
+      setGroup(dashboard.group_name || "");
+      setVisibility(dashboard.visibility);
+      setError("");
+    }
+  }, [dashboard]);
+
+  const save = useMutation({
+    mutationFn: async () =>
+      api.patch(`/api/dashboards/${dashboard!.id}`, {
+        name,
+        description: description || null,
+        visibility,
+        group_name: group.trim() || null,
+      }),
+    onSuccess: onSaved,
+    onError: (err: any) => setError(err?.response?.data?.detail || "No se pudo guardar"),
+  });
+
+  return (
+    <Modal open={!!dashboard} onClose={onClose} title={`Editar — ${dashboard?.name ?? ""}`}>
+      <div className="space-y-4">
+        <div>
+          <label className="label">Nombre</label>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Descripción (opcional)</label>
+          <textarea
+            className="input min-h-[64px]"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">Carpeta</label>
+            <input
+              className="input"
+              list="folder-options"
+              value={group}
+              onChange={(e) => setGroup(e.target.value)}
+              placeholder="General"
+            />
+            <datalist id="folder-options">
+              {folders.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
+            <p className="mt-1 text-xs text-muted-fg">
+              Escribe una nueva para crearla, o elige una existente para mover.
+            </p>
+          </div>
+          <div>
+            <label className="label">Visibilidad</label>
+            <select
+              className="input"
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as Visibility)}
+            >
+              {(Object.keys(VISIBILITY_LABELS) as Visibility[]).map((v) => (
+                <option key={v} value={v}>
+                  {VISIBILITY_LABELS[v]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <ErrorText>{error}</ErrorText>
+        <div className="flex justify-end gap-2 pt-2">
+          <button type="button" className="btn-outline" onClick={onClose}>
+            Cancelar
+          </button>
+          <button
+            className="btn-primary"
+            onClick={() => save.mutate()}
+            disabled={save.isPending || !name.trim()}
+          >
+            {save.isPending ? <Spinner className="border-primary-fg" /> : "Guardar"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

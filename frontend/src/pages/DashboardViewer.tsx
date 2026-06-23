@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { ContentToken, Dashboard } from "../api/types";
 import { ExcelView } from "../components/ExcelView";
-import { FullSpinner, TypeBadge } from "../components/ui";
+import { FullSpinner } from "../components/ui";
 
 export default function DashboardViewer() {
   const { id = "" } = useParams();
@@ -25,14 +25,28 @@ export default function DashboardViewer() {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-4">
-        <Link to="/" className="btn-ghost p-2" title="Volver">
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-white/10 bg-dark px-4 text-white">
+        <Link
+          to="/"
+          className="btn p-2 text-white hover:bg-white/10"
+          title="Volver"
+        >
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="truncate font-medium text-fg">{d?.name || "Cargando…"}</h1>
-            {d && <TypeBadge type={d.type} />}
+            <h1 className="truncate font-semibold tracking-tight text-white">
+              {d?.name || "Cargando…"}
+            </h1>
+            {d && (
+              <span
+                className={`badge ${
+                  d.type === "excel" ? "bg-accent/20 text-accent" : "bg-white/10 text-white"
+                }`}
+              >
+                {d.type === "excel" ? "Excel" : "HTML"}
+              </span>
+            )}
           </div>
         </div>
       </header>

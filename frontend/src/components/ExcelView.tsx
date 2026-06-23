@@ -21,7 +21,8 @@ import { api } from "../api/client";
 import type { ExcelSheet, ExcelData } from "../api/types";
 import { FullSpinner } from "./ui";
 
-const CHART_COLORS = ["#8b8ef0", "#5fc9b0", "#f0a3b8", "#f3c969", "#9bb5f0"];
+// BioNet corporate palette: calipso, celeste, naranjo, amarillo, azul oscuro.
+const CHART_COLORS = ["#007cb7", "#45c7ff", "#f58220", "#fdb515", "#002440"];
 
 function Chart({ chart }: { chart: NonNullable<ExcelSheet["chart"]> }) {
   const type = chart.type ?? "bar";

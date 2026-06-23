@@ -19,30 +19,39 @@ function timeAgo(iso: string | null): string {
 }
 
 function DashboardCard({ d }: { d: Dashboard }) {
+  const isExcel = d.type === "excel";
   return (
     <Link
       to={`/d/${d.id}`}
-      className="card group flex flex-col p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
+      className="glass group flex flex-col p-5 text-white transition duration-200 hover:-translate-y-1 hover:border-white/30 hover:shadow-glow"
     >
       <div className="mb-4 flex items-start justify-between">
         <div
           className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-            d.type === "excel" ? "bg-accent-soft text-accent" : "bg-primary-soft text-primary"
+            isExcel ? "bg-accent/20 text-accent" : "bg-primary/25 text-white"
           }`}
         >
-          {d.type === "excel" ? (
+          {isExcel ? (
             <FileSpreadsheet className="h-6 w-6" />
           ) : (
             <LayoutDashboard className="h-6 w-6" />
           )}
         </div>
-        <TypeBadge type={d.type} />
+        <span
+          className={`badge ${
+            isExcel ? "bg-accent/20 text-accent" : "bg-white/10 text-white"
+          }`}
+        >
+          {isExcel ? "Excel" : "HTML"}
+        </span>
       </div>
-      <h3 className="font-medium text-fg group-hover:text-primary">{d.name}</h3>
+      <h3 className="font-semibold tracking-tight text-white group-hover:text-accent">
+        {d.name}
+      </h3>
       {d.description && (
-        <p className="mt-1 line-clamp-2 text-sm text-muted-fg">{d.description}</p>
+        <p className="mt-1 line-clamp-2 text-sm text-dark-muted-fg">{d.description}</p>
       )}
-      <div className="mt-auto pt-4 text-xs text-muted-fg">
+      <div className="mt-auto pt-4 text-xs text-dark-muted-fg">
         Actualizado {timeAgo(d.uploaded_at)}
       </div>
     </Link>
@@ -80,17 +89,19 @@ export default function Home() {
   }, [data, q]);
 
   return (
-    <Layout>
+    <Layout dark>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-fg">Tus dashboards</h1>
-          <p className="mt-1 text-muted-fg">Selecciona un reporte para abrirlo.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Tus dashboards</h1>
+          <p className="mt-1 font-light text-dark-muted-fg">
+            Selecciona un reporte para abrirlo.
+          </p>
         </div>
         {data && data.length > 0 && (
           <div className="relative w-full max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-fg" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-dark-muted-fg" />
             <input
-              className="input pl-9"
+              className="w-full rounded-xl border border-white/15 bg-white/5 px-3.5 py-2.5 pl-9 text-sm text-white outline-none transition placeholder:text-dark-muted-fg focus:border-accent focus:ring-2 focus:ring-accent/30"
               placeholder="Buscar dashboard…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -102,15 +113,15 @@ export default function Home() {
       {isLoading ? (
         <FullSpinner />
       ) : !data || data.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center px-6 py-20 text-center">
-          <LayoutDashboard className="h-10 w-10 text-muted-fg" />
-          <p className="mt-4 text-fg">Aún no tienes dashboards disponibles.</p>
-          <p className="text-sm text-muted-fg">
+        <div className="glass flex flex-col items-center justify-center px-6 py-20 text-center text-white">
+          <LayoutDashboard className="h-10 w-10 text-accent" />
+          <p className="mt-4">Aún no tienes dashboards disponibles.</p>
+          <p className="text-sm font-light text-dark-muted-fg">
             El administrador te dará acceso cuando estén listos.
           </p>
         </div>
       ) : groups.length === 0 ? (
-        <div className="card px-6 py-16 text-center text-muted-fg">
+        <div className="glass px-6 py-16 text-center font-light text-dark-muted-fg">
           No hay dashboards que coincidan con "{q}".
         </div>
       ) : (
@@ -119,7 +130,7 @@ export default function Home() {
             <section key={group}>
               {/* Only show the group header when there's more than one group. */}
               {groups.length > 1 && (
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-fg">
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.12em] text-accent">
                   {group}
                 </h2>
               )}

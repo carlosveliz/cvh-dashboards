@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
   FolderOpen,
+  GripVertical,
   History,
   Pencil,
   Plus,
@@ -43,6 +44,8 @@ export default function AdminDashboards() {
   const [chartFor, setChartFor] = useState<Dashboard | null>(null);
   const [editing, setEditing] = useState<Dashboard | null>(null);
   const [uploadError, setUploadError] = useState<Record<string, string>>({});
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overKey, setOverKey] = useState<string>("");
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const { data, isLoading } = useQuery({
@@ -85,6 +88,43 @@ export default function AdminDashboards() {
     );
   }
 
+  // Drag-and-drop: move a dashboard to the folder it's dropped on.
+  const move = useMutation({
+    mutationFn: async ({ id, folderId }: { id: string; folderId: string | null }) =>
+      api.patch(`/api/dashboards/${id}`, { folder_id: folderId }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-dashboards"] });
+      qc.invalidateQueries({ queryKey: ["admin-folders"] });
+      qc.invalidateQueries({ queryKey: ["dashboards"] });
+    },
+  });
+
+  const GENERAL = "__general__";
+
+  function onDropTo(groupKey: string) {
+    setOverKey("");
+    const id = dragId;
+    setDragId(null);
+    if (!id) return;
+    const targetFolderId = groupKey === GENERAL ? null : groupKey;
+    const d = data?.find((x) => x.id === id);
+    if (!d || (d.folder_id ?? null) === targetFolderId) return; // already there
+    move.mutate({ id, folderId: targetFolderId });
+  }
+
+  // Build drop groups: every folder (even empty) ordered by position, then General.
+  const groups: { key: string; name: string; items: Dashboard[] }[] = [
+    ...(folders ?? [])
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map((f) => ({
+        key: f.id,
+        name: f.name,
+        items: (data ?? []).filter((d) => d.folder_id === f.id),
+      })),
+    { key: GENERAL, name: "General", items: (data ?? []).filter((d) => !d.folder_id) },
+  ];
+
   if (isLoading) return <FullSpinner />;
 
   return (
@@ -95,88 +135,141 @@ export default function AdminDashboards() {
         </button>
       </div>
 
-      <div className="space-y-3">
-        {data?.length === 0 && (
-          <div className="card p-10 text-center text-muted-fg">
-            Aún no hay dashboards. Crea el primero.
-          </div>
-        )}
-        {data?.map((d) => (
-          <div key={d.id} className="card flex flex-wrap items-center gap-4 p-4">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-fg">{d.name}</span>
-                <TypeBadge type={d.type} />
-                <span className="badge bg-muted text-muted-fg">
-                  {VISIBILITY_LABELS[d.visibility] ?? d.visibility}
-                </span>
-                <span className="badge inline-flex items-center gap-1 bg-primary-soft text-primary">
-                  <FolderOpen className="h-3 w-3" />
-                  {d.folder_name || "General"}
-                </span>
-              </div>
-              <div className="mt-0.5 text-sm text-muted-fg">
-                {d.has_content ? `Archivo: ${d.file_name}` : "Sin contenido"}
-              </div>
-              {uploadError[d.id] && <ErrorText>{uploadError[d.id]}</ErrorText>}
-            </div>
+      {data?.length === 0 ? (
+        <div className="card p-10 text-center text-muted-fg">
+          Aún no hay dashboards. Crea el primero.
+        </div>
+      ) : (
+        <>
+          <p className="mb-4 text-sm text-muted-fg">
+            Arrastra un dashboard a otra carpeta para moverlo.
+          </p>
+          <div className="space-y-5">
+            {groups.map((g) => {
+              const isOver = overKey === g.key;
+              return (
+                <section
+                  key={g.key}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    if (overKey !== g.key) setOverKey(g.key);
+                  }}
+                  onDrop={() => onDropTo(g.key)}
+                  className={`rounded-2xl border-2 border-dashed p-3 transition ${
+                    isOver ? "border-primary bg-primary-soft/50" : "border-transparent"
+                  }`}
+                >
+                  <div className="mb-2 flex items-center gap-2 px-1">
+                    <FolderOpen className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-fg">
+                      {g.name}
+                    </h3>
+                    <span className="text-xs text-muted-fg">
+                      {g.items.length} {g.items.length === 1 ? "dashboard" : "dashboards"}
+                    </span>
+                  </div>
+                  {g.items.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-fg">
+                      Arrastra dashboards aquí
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {g.items.map((d) => (
+                        <div
+                          key={d.id}
+                          draggable
+                          onDragStart={() => setDragId(d.id)}
+                          onDragEnd={() => {
+                            setDragId(null);
+                            setOverKey("");
+                          }}
+                          className={`card flex flex-wrap items-center gap-3 p-4 transition ${
+                            dragId === d.id ? "opacity-50 ring-2 ring-primary" : ""
+                          }`}
+                        >
+                          <span
+                            className="cursor-grab text-muted-fg active:cursor-grabbing"
+                            title="Arrastrar para mover"
+                          >
+                            <GripVertical className="h-5 w-5" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-semibold text-fg">{d.name}</span>
+                              <TypeBadge type={d.type} />
+                              <span className="badge bg-muted text-muted-fg">
+                                {VISIBILITY_LABELS[d.visibility] ?? d.visibility}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 text-sm text-muted-fg">
+                              {d.has_content ? `Archivo: ${d.file_name}` : "Sin contenido"}
+                            </div>
+                            {uploadError[d.id] && <ErrorText>{uploadError[d.id]}</ErrorText>}
+                          </div>
 
-            <input
-              type="file"
-              hidden
-              ref={(el) => (fileInputs.current[d.id] = el)}
-              accept={d.type === "excel" ? ".xlsx" : ".html,.htm"}
-              onChange={(e) => onPickFile(d, e.target.files?.[0])}
-            />
-            <button
-              className="btn-outline"
-              onClick={() => fileInputs.current[d.id]?.click()}
-              disabled={upload.isPending}
-            >
-              {upload.isPending && upload.variables?.id === d.id ? (
-                <Spinner />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-              Subir {d.type === "excel" ? ".xlsx" : ".html"}
-            </button>
-            <button
-              className="btn-ghost p-2.5"
-              onClick={() => setEditing(d)}
-              title="Editar / mover de carpeta"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            {d.type === "excel" && (
-              <button
-                className="btn-ghost p-2.5"
-                onClick={() => setChartFor(d)}
-                disabled={!d.has_content}
-                title="Configurar gráfico"
-              >
-                <BarChart3 className="h-4 w-4" />
-              </button>
-            )}
-            <button
-              className="btn-ghost p-2.5"
-              onClick={() => setVersionsFor(d)}
-              disabled={!d.has_content}
-              title="Versiones"
-            >
-              <History className="h-4 w-4" />
-            </button>
-            <button
-              className="btn-ghost p-2.5 text-danger"
-              onClick={() => {
-                if (confirm(`¿Eliminar "${d.name}"?`)) remove.mutate(d.id);
-              }}
-              title="Eliminar"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+                          <input
+                            type="file"
+                            hidden
+                            ref={(el) => (fileInputs.current[d.id] = el)}
+                            accept={d.type === "excel" ? ".xlsx" : ".html,.htm"}
+                            onChange={(e) => onPickFile(d, e.target.files?.[0])}
+                          />
+                          <button
+                            className="btn-outline"
+                            onClick={() => fileInputs.current[d.id]?.click()}
+                            disabled={upload.isPending}
+                          >
+                            {upload.isPending && upload.variables?.id === d.id ? (
+                              <Spinner />
+                            ) : (
+                              <Upload className="h-4 w-4" />
+                            )}
+                            Subir {d.type === "excel" ? ".xlsx" : ".html"}
+                          </button>
+                          <button
+                            className="btn-ghost p-2.5"
+                            onClick={() => setEditing(d)}
+                            title="Editar / mover de carpeta"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          {d.type === "excel" && (
+                            <button
+                              className="btn-ghost p-2.5"
+                              onClick={() => setChartFor(d)}
+                              disabled={!d.has_content}
+                              title="Configurar gráfico"
+                            >
+                              <BarChart3 className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            className="btn-ghost p-2.5"
+                            onClick={() => setVersionsFor(d)}
+                            disabled={!d.has_content}
+                            title="Versiones"
+                          >
+                            <History className="h-4 w-4" />
+                          </button>
+                          <button
+                            className="btn-ghost p-2.5 text-danger"
+                            onClick={() => {
+                              if (confirm(`¿Eliminar "${d.name}"?`)) remove.mutate(d.id);
+                            }}
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       <CreateModal
         open={showCreate}

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Env / secrets
+.env
+*.local
+
+# Uploads (local dev)
+backend/uploads/
+data/
+
+# Backups produced by scripts/backup.sh
+backups/
+
+# Local verification compose (not part of the deployable stack)
+docker-compose.verify.yml
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

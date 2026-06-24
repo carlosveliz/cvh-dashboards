@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ---- BioNet corporate palette (HSL channels) ----
+     Calipso #007cb7 · Azul oscuro #002440 · Celeste #45c7ff
+     Naranjo #f58220 · Amarillo #fdb515                         */
+
+  /* Light content surface (admin, tables, Excel) — clean & clinical */
+  --bg: 204 38% 97%;
+  --surface: 0 0% 100%;
+  --border: 205 28% 90%;
+  --muted: 205 33% 95%;
+  --muted-fg: 205 16% 42%;
+  --fg: 205 100% 13%; /* azul oscuro institucional para texto */
+
+  --primary: 199 100% 36%; /* calipso #007cb7 */
+  --primary-fg: 0 0% 100%;
+  --primary-soft: 199 100% 93%;
+
+  --accent: 201 100% 64%; /* celeste #45c7ff */
+  --accent-soft: 201 100% 94%;
+
+  --success: 168 64% 38%;
+  --success-soft: 168 55% 93%;
+  --danger: 28 91% 55%; /* naranjo #f58220 (alertas) */
+  --danger-soft: 28 95% 94%;
+  --warning: 43 98% 54%; /* amarillo #fdb515 */
+
+  /* Dark institutional shell (login, launcher, top bar) */
+  --dark: 205 100% 13%; /* #002440 */
+  --dark-2: 203 100% 18%;
+  --dark-fg: 0 0% 100%;
+  --dark-muted-fg: 201 30% 80%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: hsl(var(--bg));
+  color: hsl(var(--fg));
+  font-family: "Montserrat", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold tracking-tight transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-primary-fg shadow-soft hover:brightness-110 active:brightness-95;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent font-medium text-fg hover:bg-muted;
+  }
+  .btn-outline {
+    @apply btn border border-border bg-surface font-medium text-fg hover:bg-muted;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:brightness-105;
+  }
+  .input {
+    @apply w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-fg placeholder:text-muted-fg outline-none transition focus:border-primary focus:ring-2 focus:ring-primary-soft;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-fg;
+  }
+  .card {
+    @apply rounded-2xl border border-border bg-surface shadow-soft;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+
+  /* Dark institutional shell ---------------------------------- */
+  .bg-institutional {
+    background-color: hsl(var(--dark));
+    background-image: radial-gradient(
+        110% 110% at 0% 0%,
+        hsl(var(--primary) / 0.45) 0%,
+        transparent 55%
+      ),
+      radial-gradient(120% 120% at 100% 100%, hsl(var(--accent) / 0.28) 0%, transparent 50%),
+      linear-gradient(135deg, hsl(var(--dark)) 0%, hsl(var(--dark-2)) 100%);
+  }
+  /* Glassmorphism card for use on dark backgrounds */
+  .glass {
+    @apply rounded-2xl border shadow-soft backdrop-blur-xl;
+    background-color: hsl(0 0% 100% / 0.07);
+    border-color: hsl(0 0% 100% / 0.14);
+  }
+  .glass-strong {
+    @apply rounded-2xl border shadow-soft backdrop-blur-xl;
+    background-color: hsl(0 0% 100% / 0.1);
+    border-color: hsl(0 0% 100% / 0.18);
+  }
+}

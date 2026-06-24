@@ -25,7 +25,9 @@ class DashboardRead(BaseModel):
     description: str | None = None
     type: str
     visibility: str
-    group_name: str | None = None
+    folder_id: uuid.UUID | None = None
+    folder_name: str | None = None
+    folder_position: int | None = None
     excel_config: ExcelConfig | None = None
     file_name: str | None = None
     has_content: bool = False
@@ -38,14 +40,14 @@ class DashboardCreate(BaseModel):
     description: str | None = None
     type: DashboardType
     visibility: Visibility = "restricted"
-    group_name: str | None = Field(default=None, max_length=120)
+    folder_id: uuid.UUID | None = None
 
 
 class DashboardUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=255)
     description: str | None = None
     visibility: Visibility | None = None
-    group_name: str | None = Field(default=None, max_length=120)
+    folder_id: uuid.UUID | None = None
     excel_config: ExcelConfig | None = None
 
 

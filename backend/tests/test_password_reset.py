@@ -61,17 +61,3 @@ async def test_reset_flow(client, admin_client, db):
     # Token is single-use now.
     again = await client.post("/api/auth/reset", json={"token": raw, "password": "Another123"})
     assert again.status_code == 400
-
-
-async def test_group_name_persisted(admin_client):
-    r = await admin_client.post(
-        "/api/dashboards",
-        json={
-            "name": "Grouped",
-            "type": "static_html",
-            "visibility": "restricted",
-            "group_name": "Finanzas",
-        },
-    )
-    assert r.status_code == 201
-    assert r.json()["group_name"] == "Finanzas"

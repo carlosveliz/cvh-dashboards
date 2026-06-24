@@ -13,10 +13,11 @@ from fastapi import (
 )
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ..config import settings
 from ..db import get_db
-from ..models import Dashboard, DashboardAccess, DashboardVersion, User
+from ..models import Dashboard, DashboardAccess, DashboardVersion, Folder, User
 from ..schemas import (
     DashboardCreate,
     DashboardRead,
@@ -39,7 +40,7 @@ def _slugify(name: str) -> str:
     return slug or "dashboard"
 
 
-def _to_read(d: Dashboard) -> DashboardRead:
+def _to_read(d: Dashboard, folder: Folder | None = None) -> DashboardRead:
     return DashboardRead(
         id=d.id,
         slug=d.slug,
@@ -47,7 +48,9 @@ def _to_read(d: Dashboard) -> DashboardRead:
         description=d.description,
         type=d.type,
         visibility=d.visibility,
-        group_name=d.group_name,
+        folder_id=d.folder_id,
+        folder_name=folder.name if folder else None,
+        folder_position=folder.position if folder else None,
         excel_config=d.excel_config,
         file_name=d.file_name,
         has_content=bool(d.file_path),
@@ -70,15 +73,18 @@ async def list_dashboards(
     db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
 ):
     if user.is_admin:
-        result = await db.execute(select(Dashboard).order_by(Dashboard.name))
-        return [_to_read(d) for d in result.scalars().all()]
+        result = await db.execute(
+            select(Dashboard).options(selectinload(Dashboard.folder)).order_by(Dashboard.name)
+        )
+        return [_to_read(d, d.folder) for d in result.scalars().all()]
     result = await db.execute(
         select(Dashboard)
+        .options(selectinload(Dashboard.folder))
         .join(DashboardAccess, DashboardAccess.dashboard_id == Dashboard.id)
         .where(DashboardAccess.user_id == user.id)
         .order_by(Dashboard.name)
     )
-    return [_to_read(d) for d in result.scalars().all()]
+    return [_to_read(d, d.folder) for d in result.scalars().all()]
 
 
 @router.get("/{dashboard_id}", response_model=DashboardRead)
@@ -163,7 +169,7 @@ async def create_dashboard(
         description=payload.description,
         type=payload.type,
         visibility=payload.visibility,
-        group_name=payload.group_name,
+        folder_id=payload.folder_id,
         created_by=admin.id,
     )
     db.add(d)
@@ -192,8 +198,9 @@ async def update_dashboard(
         d.description = payload.description
     if payload.visibility is not None:
         d.visibility = payload.visibility
-    if payload.group_name is not None:
-        d.group_name = payload.group_name or None
+    # folder_id is applied only when the client included it (null = "General").
+    if "folder_id" in payload.model_fields_set:
+        d.folder_id = payload.folder_id
     if payload.excel_config is not None:
         d.excel_config = payload.excel_config.model_dump()
     await db.commit()

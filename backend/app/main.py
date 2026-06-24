@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from . import models  # noqa: F401  (register models on Base.metadata)
 from .config import settings
 from .observability import RequestLogMiddleware, configure_logging, init_sentry
-from .routers import audit, auth, content, dashboards, users
+from .routers import audit, auth, content, dashboards, folders, users
 from .seed import seed_admin
 from .security.limiter import limiter
 from .startup import check_secret_key, start_cleanup_loop
@@ -51,6 +51,7 @@ app.include_router(users.router)
 app.include_router(dashboards.router)
 app.include_router(content.router)
 app.include_router(audit.router)
+app.include_router(folders.router)
 
 
 @app.get("/api/health")

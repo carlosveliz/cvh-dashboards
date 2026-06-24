@@ -13,6 +13,7 @@ from .dashboard import (
     ExcelData,
     PermissionSet,
 )
+from .folder import FolderCreate, FolderRead, FolderReorder, FolderUpdate
 from .user import (
     InvitationCreate,
     InvitationResult,
@@ -38,4 +39,8 @@ __all__ = [
     "DashboardVersionRead",
     "PermissionSet",
     "ExcelData",
+    "FolderCreate",
+    "FolderUpdate",
+    "FolderRead",
+    "FolderReorder",
 ]

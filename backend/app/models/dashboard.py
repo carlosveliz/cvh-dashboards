@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, String, Text, Uuid, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, Uuid, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,8 +20,10 @@ class Dashboard(Base):
     type: Mapped[str] = mapped_column(String(16), nullable=False)
     # UI hint only: 'restricted' | 'internal' | 'external' | 'personal'
     visibility: Mapped[str] = mapped_column(String(16), default="restricted", nullable=False)
-    # Optional folder/group shown in the launcher (null -> "General").
-    group_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # Folder shown in the launcher (null -> virtual "General" group).
+    folder_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("folder.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     # Excel chart config (null -> heuristic): {sheet, chart_type, category, series[]}
     excel_config: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
@@ -42,3 +44,4 @@ class Dashboard(Base):
     access_grants: Mapped[list["DashboardAccess"]] = relationship(
         back_populates="dashboard", cascade="all, delete-orphan"
     )
+    folder: Mapped["Folder | None"] = relationship(back_populates="dashboards")

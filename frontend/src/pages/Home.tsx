@@ -65,7 +65,8 @@ export default function Home() {
   });
   const [q, setQ] = useState("");
 
-  // Filter by search, then group by group_name (null -> "General").
+  // Filter by search, then group by folder (null -> "General"), ordered by the
+  // folder's position; "General" always last.
   const groups = useMemo(() => {
     const term = q.trim().toLowerCase();
     const filtered = (data ?? []).filter(
@@ -74,18 +75,16 @@ export default function Home() {
         d.name.toLowerCase().includes(term) ||
         (d.description ?? "").toLowerCase().includes(term),
     );
-    const map = new Map<string, Dashboard[]>();
+    const map = new Map<string, { items: Dashboard[]; pos: number }>();
     for (const d of filtered) {
-      const key = d.group_name?.trim() || "General";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(d);
+      const key = d.folder_name?.trim() || "General";
+      const pos = d.folder_name ? (d.folder_position ?? 0) : Number.MAX_SAFE_INTEGER;
+      if (!map.has(key)) map.set(key, { items: [], pos });
+      map.get(key)!.items.push(d);
     }
-    // Sort group names, keep "General" last.
-    return [...map.entries()].sort(([a], [b]) => {
-      if (a === "General") return 1;
-      if (b === "General") return -1;
-      return a.localeCompare(b);
-    });
+    return [...map.entries()]
+      .sort(([, a], [, b]) => a.pos - b.pos)
+      .map(([name, g]) => [name, g.items] as [string, Dashboard[]]);
   }, [data, q]);
 
   return (

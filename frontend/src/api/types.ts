@@ -26,12 +26,21 @@ export interface Dashboard {
   description: string | null;
   type: DashboardType;
   visibility: Visibility;
-  group_name: string | null;
+  folder_id: string | null;
+  folder_name: string | null;
+  folder_position: number | null;
   excel_config: ExcelConfig | null;
   file_name: string | null;
   has_content: boolean;
   uploaded_at: string | null;
   updated_at: string;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  position: number;
+  dashboard_count: number;
 }
 
 export interface InvitationResult {

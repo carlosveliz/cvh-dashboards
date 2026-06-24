@@ -9,7 +9,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
 import type {
   ChartType,
@@ -17,6 +17,7 @@ import type {
   DashboardType,
   DashboardVersion,
   ExcelData,
+  Folder,
   Visibility,
 } from "../../api/types";
 import { ErrorText, FullSpinner, Modal, Spinner, TypeBadge } from "../../components/ui";
@@ -49,12 +50,11 @@ export default function AdminDashboards() {
     queryFn: async () => (await api.get<Dashboard[]>("/api/dashboards")).data,
   });
 
-  // Existing folder names, for the move/create-folder suggestions.
-  const folders = useMemo(
-    () =>
-      [...new Set((data ?? []).map((d) => d.group_name).filter(Boolean))].sort() as string[],
-    [data],
-  );
+  // Folders for the assign/move dropdowns (managed in the Carpetas tab).
+  const { data: folders } = useQuery({
+    queryKey: ["admin-folders"],
+    queryFn: async () => (await api.get<Folder[]>("/api/folders")).data,
+  });
 
   const remove = useMutation({
     mutationFn: async (id: string) => api.delete(`/api/dashboards/${id}`),
@@ -112,7 +112,7 @@ export default function AdminDashboards() {
                 </span>
                 <span className="badge inline-flex items-center gap-1 bg-primary-soft text-primary">
                   <FolderOpen className="h-3 w-3" />
-                  {d.group_name || "General"}
+                  {d.folder_name || "General"}
                 </span>
               </div>
               <div className="mt-0.5 text-sm text-muted-fg">
@@ -180,6 +180,7 @@ export default function AdminDashboards() {
 
       <CreateModal
         open={showCreate}
+        folders={folders ?? []}
         onClose={() => setShowCreate(false)}
         onCreated={() => {
           setShowCreate(false);
@@ -201,7 +202,7 @@ export default function AdminDashboards() {
 
       <EditModal
         dashboard={editing}
-        folders={folders}
+        folders={folders ?? []}
         onClose={() => setEditing(null)}
         onSaved={() => {
           setEditing(null);
@@ -220,13 +221,13 @@ function EditModal({
   onSaved,
 }: {
   dashboard: Dashboard | null;
-  folders: string[];
+  folders: Folder[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [group, setGroup] = useState("");
+  const [folderId, setFolderId] = useState<string>("");
   const [visibility, setVisibility] = useState<Visibility>("restricted");
   const [error, setError] = useState("");
 
@@ -235,7 +236,7 @@ function EditModal({
     if (dashboard) {
       setName(dashboard.name);
       setDescription(dashboard.description || "");
-      setGroup(dashboard.group_name || "");
+      setFolderId(dashboard.folder_id || "");
       setVisibility(dashboard.visibility);
       setError("");
     }
@@ -247,7 +248,7 @@ function EditModal({
         name,
         description: description || null,
         visibility,
-        group_name: group.trim() || null,
+        folder_id: folderId || null,
       }),
     onSuccess: onSaved,
     onError: (err: any) => setError(err?.response?.data?.detail || "No se pudo guardar"),
@@ -271,20 +272,20 @@ function EditModal({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="label">Carpeta</label>
-            <input
+            <select
               className="input"
-              list="folder-options"
-              value={group}
-              onChange={(e) => setGroup(e.target.value)}
-              placeholder="General"
-            />
-            <datalist id="folder-options">
+              value={folderId}
+              onChange={(e) => setFolderId(e.target.value)}
+            >
+              <option value="">General (sin carpeta)</option>
               {folders.map((f) => (
-                <option key={f} value={f} />
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
               ))}
-            </datalist>
+            </select>
             <p className="mt-1 text-xs text-muted-fg">
-              Escribe una nueva para crearla, o elige una existente para mover.
+              Crea y administra carpetas en la pestaña <strong>Carpetas</strong>.
             </p>
           </div>
           <div>
@@ -565,16 +566,18 @@ function VersionsModal({
 
 function CreateModal({
   open,
+  folders,
   onClose,
   onCreated,
 }: {
   open: boolean;
+  folders: Folder[];
   onClose: () => void;
   onCreated: () => void;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [group, setGroup] = useState("");
+  const [folderId, setFolderId] = useState<string>("");
   const [type, setType] = useState<DashboardType>("static_html");
   const [visibility, setVisibility] = useState<Visibility>("restricted");
   const [error, setError] = useState("");
@@ -590,11 +593,11 @@ function CreateModal({
         description: description || null,
         type,
         visibility,
-        group_name: group.trim() || null,
+        folder_id: folderId || null,
       });
       setName("");
       setDescription("");
-      setGroup("");
+      setFolderId("");
       setType("static_html");
       setVisibility("restricted");
       onCreated();
@@ -621,13 +624,19 @@ function CreateModal({
           />
         </div>
         <div>
-          <label className="label">Grupo / carpeta (opcional)</label>
-          <input
+          <label className="label">Carpeta</label>
+          <select
             className="input"
-            value={group}
-            onChange={(e) => setGroup(e.target.value)}
-            placeholder="Ej: Finanzas, Operaciones…"
-          />
+            value={folderId}
+            onChange={(e) => setFolderId(e.target.value)}
+          >
+            <option value="">General (sin carpeta)</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>

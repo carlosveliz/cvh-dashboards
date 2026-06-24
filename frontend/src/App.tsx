@@ -10,6 +10,7 @@ import ResetPassword from "./pages/ResetPassword";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminAudit from "./pages/admin/Audit";
 import AdminDashboards from "./pages/admin/Dashboards";
+import AdminFolders from "./pages/admin/Folders";
 import AdminPermissions from "./pages/admin/Permissions";
 import AdminUsers from "./pages/admin/Users";
 import type { ReactNode } from "react";
@@ -62,6 +63,7 @@ export default function App() {
       >
         <Route index element={<Navigate to="/admin/dashboards" replace />} />
         <Route path="dashboards" element={<AdminDashboards />} />
+        <Route path="folders" element={<AdminFolders />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="permissions" element={<AdminPermissions />} />
         <Route path="audit" element={<AdminAudit />} />
